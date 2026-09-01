@@ -1,4 +1,4 @@
-# Contributing to *jellyfin-seerr-proxy*
+# Contributing to *jellyfin-plugin-seerr-proxy*
 
 Issues and pull requests are welcome!
 
