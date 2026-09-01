@@ -33,7 +33,7 @@
                         <div class="inputContainer">
                             <label class="inputLabel" for="txtSeerrApiKey">Seerr API Key</label>
                             <input id="txtSeerrApiKey" type="password" class="emby-input" autocomplete="off" />
-                            <div class="fieldDescription">
+                            <div id="apiKeySourceDescription" class="fieldDescription">
                                 Stored server-side in Jellyfin. Clients never receive this key.
                             </div>
                         </div>
@@ -48,6 +48,16 @@
 
                     <div class="verticalSection" style="margin-top: 2em;">
                         <h2 class="sectionTitle">Connection Test</h2>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtOperatorSecret">Operator Secret</label>
+                            <input id="txtOperatorSecret" type="password" class="emby-input" autocomplete="off" />
+                            <div class="fieldDescription">
+                                Required only when this server sets SEERR_PROXY_ADMIN_SECRET_HASH. Never saved,
+                                never stored in the plugin configuration, and used only for this test.
+                            </div>
+                        </div>
+
                         <div style="margin-bottom: 1em;">
                             <button id="btnTestConnection" is="emby-button" type="button" class="raised block emby-button">
                                 <span>Test Connection</span>
@@ -116,17 +126,40 @@
             document.getElementById('testConnectionResult').textContent = message || '';
         }
 
+        function applyApiKeySource(config) {
+            var fromEnvironment = !!getConfigValue(config, 'ApiKeyFromEnvironment', 'apiKeyFromEnvironment', false);
+            var field = document.getElementById('txtSeerrApiKey');
+            var description = document.getElementById('apiKeySourceDescription');
+
+            field.disabled = fromEnvironment;
+
+            if (fromEnvironment) {
+                field.value = '';
+                field.placeholder = 'Supplied by the environment';
+                description.textContent = 'Supplied by SEERR_PROXY_API_KEY or SEERR_PROXY_API_KEY_FILE. '
+                    + 'The environment value takes precedence, so this field is inactive and anything stored '
+                    + 'here is ignored.';
+                return;
+            }
+
+            field.placeholder = '';
+            field.value = getConfigValue(config, 'SeerrApiKey', 'seerrApiKey', '') || '';
+            description.textContent = 'Stored server-side in Jellyfin. Clients never receive this key, but any '
+                + 'Jellyfin admin credential can read it back. Set SEERR_PROXY_API_KEY_FILE instead to keep it '
+                + 'out of the plugin configuration entirely.';
+        }
+
         document.getElementById('SeerrProxyConfigPage').addEventListener('pageshow', function () {
             Dashboard.showLoadingMsg();
             ApiClient.getPluginConfiguration(SeerrProxyConfig.pluginId).then(function (config) {
                 document.getElementById('chkEnabled').checked = !!getConfigValue(config, 'Enabled', 'enabled', false);
                 document.getElementById('txtSeerrBaseUrl').value = getConfigValue(config, 'SeerrBaseUrl', 'seerrBaseUrl', '') || '';
-                document.getElementById('txtSeerrApiKey').value = getConfigValue(config, 'SeerrApiKey', 'seerrApiKey', '') || '';
                 document.getElementById('txtRequestTimeoutSeconds').value = getConfigValue(
                     config,
                     'RequestTimeoutSeconds',
                     'requestTimeoutSeconds',
                     30);
+                applyApiKeySource(config);
                 setTestConnectionResult('');
                 Dashboard.hideLoadingMsg();
             }).catch(function () {
@@ -145,7 +178,15 @@
             ApiClient.getPluginConfiguration(SeerrProxyConfig.pluginId).then(function (config) {
                 setConfigValue(config, 'Enabled', 'enabled', document.getElementById('chkEnabled').checked);
                 setConfigValue(config, 'SeerrBaseUrl', 'seerrBaseUrl', document.getElementById('txtSeerrBaseUrl').value);
-                setConfigValue(config, 'SeerrApiKey', 'seerrApiKey', document.getElementById('txtSeerrApiKey').value);
+
+                // Read from the configuration just fetched, never from page-load state.
+                // The API key field is left empty and disabled when the environment
+                // supplies the key, so a stale or missing flag here would write that
+                // empty value straight over the stored one.
+                if (!getConfigValue(config, 'ApiKeyFromEnvironment', 'apiKeyFromEnvironment', false)) {
+                    setConfigValue(config, 'SeerrApiKey', 'seerrApiKey', document.getElementById('txtSeerrApiKey').value);
+                }
+
                 setConfigValue(config, 'RequestTimeoutSeconds', 'requestTimeoutSeconds', getSanitizedTimeoutSeconds());
                 ApiClient.updatePluginConfiguration(SeerrProxyConfig.pluginId, config).then(function (result) {
                     Dashboard.processPluginConfigurationUpdateResult(result);
@@ -165,17 +206,34 @@
             Dashboard.showLoadingMsg();
             setTestConnectionResult('');
 
-            ApiClient.ajax({
+            var request = {
                 type: 'POST',
-                url: ApiClient.getUrl('Plugins/SeerrProxy/Test')
-            }).then(function (response) {
+                url: ApiClient.getUrl('Plugins/SeerrProxy/Test'),
+                dataType: 'json'
+            };
+
+            var operatorSecret = document.getElementById('txtOperatorSecret').value;
+            if (operatorSecret) {
+                request.headers = { 'X-Seerr-Proxy-Secret': operatorSecret };
+            }
+
+            ApiClient.ajax(request).then(function (response) {
                 var message = response && (response.message || response.Message)
                     ? response.message || response.Message
                     : 'Successfully connected to Seerr.';
-                setTestConnectionResult(message);
+                var source = response && (response.apiKeySource || response.ApiKeySource);
+                setTestConnectionResult(source ? message + ' API key source: ' + source + '.' : message);
                 Dashboard.hideLoadingMsg();
-            }).catch(function () {
-                setTestConnectionResult('Connection test failed. Save settings first, then check the Jellyfin server log for details.');
+            }).catch(function (error) {
+                var status = error && error.status;
+                if (status === 403) {
+                    setTestConnectionResult('Rejected. This server requires the operator secret; enter it above and test again.');
+                } else if (status === 429) {
+                    setTestConnectionResult('Too many connection tests. Wait a moment and try again.');
+                } else {
+                    setTestConnectionResult('Connection test failed. Save settings first, then check the Jellyfin server log for details.');
+                }
+
                 Dashboard.hideLoadingMsg();
             });
         });

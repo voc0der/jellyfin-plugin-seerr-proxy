@@ -15,6 +15,12 @@ jobs:
   build-pr:
     runs-on: ubuntu-latest
 
+    # Bound to the job environment rather than interpolated into each run: block.
+    # A ${{ }} expression is substituted into the script text before bash sees it, so a
+    # crafted input would run as shell -- including inside the step meant to validate it.
+    env:
+      PR_NUMBER: ${{ inputs.pr_number }}
+
     steps:
     - uses: actions/checkout@v7
       with:
@@ -23,7 +29,6 @@ jobs:
     - name: Validate PR input
       shell: bash
       run: |
-        PR_NUMBER="${{ github.event.inputs.pr_number }}"
         if ! [[ "${PR_NUMBER}" =~ ^[0-9]+$ ]]; then
           echo "Invalid pr_number input: ${PR_NUMBER}"
           exit 1
@@ -32,7 +37,6 @@ jobs:
     - name: Checkout PR branch
       shell: bash
       run: |
-        PR_NUMBER="${{ github.event.inputs.pr_number }}"
         git fetch origin "pull/${PR_NUMBER}/head:pr-${PR_NUMBER}"
         git checkout "pr-${PR_NUMBER}"
 
@@ -47,7 +51,6 @@ jobs:
     - name: Set build metadata
       shell: bash
       run: |
-        PR_NUMBER="${{ github.event.inputs.pr_number }}"
         BUILD_TAG="pr/${PR_NUMBER}"
         SAFE_TAG="pr-${PR_NUMBER}"
         FOLDER_NAME="Seerr_Proxy_${SAFE_TAG}_develop"

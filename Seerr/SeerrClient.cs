@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Jellyfin.Plugin.SeerrProxy.Configuration;
+using Jellyfin.Plugin.SeerrProxy.Security;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.SeerrProxy.Seerr;
@@ -12,29 +13,45 @@ namespace Jellyfin.Plugin.SeerrProxy.Seerr;
 /// <inheritdoc />
 public sealed class SeerrClient : ISeerrClient
 {
+    /// <summary>
+    /// Most bytes this plugin will read from a single Seerr response.
+    /// </summary>
+    /// <remarks>
+    /// The body is buffered into a string before it is parsed, so without a bound a
+    /// hostile or malfunctioning upstream could exhaust the Jellyfin server's memory one
+    /// proxied request at a time. Seerr's largest legitimate responses — a full discover
+    /// page, a long request list — are orders of magnitude under this.
+    /// </remarks>
+    private const int MaxResponseBytes = 8 * 1024 * 1024;
+
+    private const int ReadBufferSize = 8192;
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
     private readonly HttpClient _httpClient;
+    private readonly SeerrProxySecretSource _secretSource;
     private readonly ILogger<SeerrClient> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SeerrClient"/> class.
     /// </summary>
     /// <param name="httpClient">HTTP client supplied by dependency injection.</param>
+    /// <param name="secretSource">Supplies the Seerr API key.</param>
     /// <param name="logger">Logger.</param>
-    public SeerrClient(HttpClient httpClient, ILogger<SeerrClient> logger)
+    public SeerrClient(HttpClient httpClient, SeerrProxySecretSource secretSource, ILogger<SeerrClient> logger)
     {
         _httpClient = httpClient;
+        _secretSource = secretSource;
         _logger = logger;
     }
 
     /// <inheritdoc />
     public async Task<SeerrStatus> GetStatusAsync(PluginConfiguration configuration, CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, BuildUri(configuration, "status"));
+        using var request = new HttpRequestMessage(HttpMethod.Get, SeerrUriBuilder.Build(configuration, "status"));
         var result = await SendAsync(configuration, request, cancellationToken).ConfigureAwait(false);
 
         return Deserialize<SeerrStatus>(result.BodyText) ?? new SeerrStatus();
@@ -43,7 +60,7 @@ public sealed class SeerrClient : ISeerrClient
     /// <inheritdoc />
     public async Task ValidateApiKeyAsync(PluginConfiguration configuration, CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, BuildUri(configuration, "auth/me"));
+        using var request = new HttpRequestMessage(HttpMethod.Get, SeerrUriBuilder.Build(configuration, "auth/me"));
         AddApiKey(request, configuration);
 
         await SendAsync(configuration, request, cancellationToken).ConfigureAwait(false);
@@ -57,7 +74,7 @@ public sealed class SeerrClient : ISeerrClient
     {
         using var request = new HttpRequestMessage(
             HttpMethod.Get,
-            BuildUri(configuration, "user/jellyfin/" + Uri.EscapeDataString(jellyfinUserId)));
+            SeerrUriBuilder.Build(configuration, "user/jellyfin/" + Uri.EscapeDataString(jellyfinUserId)));
         AddApiKey(request, configuration);
 
         var result = await SendAsync(configuration, request, cancellationToken).ConfigureAwait(false);
@@ -80,13 +97,16 @@ public sealed class SeerrClient : ISeerrClient
         JsonNode? payload,
         CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(method, BuildUri(configuration, relativePath));
+        using var request = new HttpRequestMessage(method, SeerrUriBuilder.Build(configuration, relativePath));
         if (payload is not null)
         {
             request.Content = new StringContent(payload.ToJsonString(), Encoding.UTF8, MediaTypeNames.Application.Json);
         }
 
         AddApiKey(request, configuration);
+
+        // The acting identity is an integer resolved server-side from Jellyfin
+        // authentication. It is never taken from the request.
         request.Headers.TryAddWithoutValidation("X-API-User", seerrUserId.ToString(CultureInfo.InvariantCulture));
 
         var result = await SendAsync(configuration, request, cancellationToken).ConfigureAwait(false);
@@ -116,69 +136,75 @@ public sealed class SeerrClient : ISeerrClient
             throw new SeerrConnectionException("Seerr is unreachable.", ex);
         }
 
-        await using var responseStream = await response.Content.ReadAsStreamAsync(timeoutTokenSource.Token)
-            .ConfigureAwait(false);
-        using var reader = new StreamReader(responseStream, Encoding.UTF8);
-        var body = await reader.ReadToEndAsync(timeoutTokenSource.Token).ConfigureAwait(false);
-
-        if (response.IsSuccessStatusCode)
+        using (response)
         {
-            return new SeerrTransportResult((int)response.StatusCode, body);
+            var body = await ReadBoundedBodyAsync(response, timeoutTokenSource.Token).ConfigureAwait(false);
+
+            if (response.IsSuccessStatusCode)
+            {
+                return new SeerrTransportResult((int)response.StatusCode, body);
+            }
+
+            _logger.LogWarning(
+                "Seerr API returned HTTP {StatusCode} for {Method} {Path}",
+                (int)response.StatusCode,
+                request.Method,
+                LogSanitizer.ForLog(request.RequestUri?.AbsolutePath));
+
+            // Redirects are not followed (see PluginServiceRegistrator), so one arriving
+            // here is a misconfigured base URL rather than a Seerr error. Say so, instead
+            // of reporting an opaque 3xx.
+            if ((int)response.StatusCode is >= 300 and < 400)
+            {
+                throw new SeerrConfigurationException(
+                    "Seerr returned a redirect. Check that the configured base URL uses the correct scheme and path.");
+            }
+
+            var message = ExtractErrorMessage(body)
+                          ?? string.Create(
+                              CultureInfo.InvariantCulture,
+                              $"Seerr returned HTTP {(int)response.StatusCode} ({response.ReasonPhrase}).");
+
+            throw new SeerrApiException(
+                response.StatusCode,
+                Sanitize(message, _secretSource.ResolveApiKey(configuration)));
         }
-
-        var message = ExtractErrorMessage(body)
-                      ?? string.Create(
-                          CultureInfo.InvariantCulture,
-                          $"Seerr returned HTTP {(int)response.StatusCode} ({response.ReasonPhrase}).");
-
-        _logger.LogWarning(
-            "Seerr API returned HTTP {StatusCode} for {Method} {Path}",
-            (int)response.StatusCode,
-            request.Method,
-            request.RequestUri?.AbsolutePath);
-
-        throw new SeerrApiException(response.StatusCode, Sanitize(message, configuration.SeerrApiKey));
     }
 
-    private static void AddApiKey(HttpRequestMessage request, PluginConfiguration configuration)
+    private static async Task<string> ReadBoundedBodyAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
-        request.Headers.TryAddWithoutValidation("X-Api-Key", configuration.SeerrApiKey);
+        if (response.Content.Headers.ContentLength > MaxResponseBytes)
+        {
+            throw new SeerrApiException(HttpStatusCode.BadGateway, "Seerr returned a response too large to proxy.");
+        }
+
+        var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        await using (responseStream.ConfigureAwait(false))
+        {
+            using var accumulator = new MemoryStream();
+            var buffer = new byte[ReadBufferSize];
+
+            int read;
+            while ((read = await responseStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+            {
+                if (accumulator.Length + read > MaxResponseBytes)
+                {
+                    throw new SeerrApiException(HttpStatusCode.BadGateway, "Seerr returned a response too large to proxy.");
+                }
+
+                accumulator.Write(buffer, 0, read);
+            }
+
+            return Encoding.UTF8.GetString(accumulator.GetBuffer(), 0, (int)accumulator.Length);
+        }
     }
 
-    private static Uri BuildUri(PluginConfiguration configuration, string relativePath)
+    private void AddApiKey(HttpRequestMessage request, PluginConfiguration configuration)
     {
-        if (string.IsNullOrWhiteSpace(configuration.SeerrBaseUrl))
-        {
-            throw new SeerrConfigurationException("Seerr base URL is not configured.");
-        }
+        var apiKey = _secretSource.ResolveApiKey(configuration)
+                     ?? throw new SeerrConfigurationException("Seerr API key is not configured.");
 
-        var trimmedBaseUrl = configuration.SeerrBaseUrl.Trim().TrimEnd('/') + "/";
-        if (!Uri.TryCreate(trimmedBaseUrl, UriKind.Absolute, out var baseUri)
-            || (baseUri.Scheme != Uri.UriSchemeHttp && baseUri.Scheme != Uri.UriSchemeHttps))
-        {
-            throw new SeerrConfigurationException("Seerr base URL must be an absolute HTTP or HTTPS URL.");
-        }
-
-        var builder = new UriBuilder(baseUri)
-        {
-            Query = string.Empty,
-            Fragment = string.Empty
-        };
-
-        var basePath = builder.Path.TrimEnd('/');
-        if (!basePath.EndsWith("/api/v1", StringComparison.OrdinalIgnoreCase)
-            && !basePath.Equals("api/v1", StringComparison.OrdinalIgnoreCase))
-        {
-            builder.Path = string.IsNullOrWhiteSpace(basePath) || basePath == "/"
-                ? "api/v1/"
-                : basePath.TrimStart('/') + "/api/v1/";
-        }
-        else
-        {
-            builder.Path = basePath.TrimStart('/') + "/";
-        }
-
-        return new Uri(builder.Uri, relativePath.TrimStart('/'));
+        request.Headers.TryAddWithoutValidation("X-Api-Key", apiKey);
     }
 
     private static T? Deserialize<T>(string body)
@@ -204,7 +230,11 @@ public sealed class SeerrClient : ISeerrClient
         }
         catch (JsonException)
         {
-            return JsonValue.Create(body);
+            // Every Seerr /api/v1 endpoint answers with JSON. Anything else on a success
+            // status means the request did not reach Seerr — a captive portal or an error
+            // page from something in front of it — and relaying that page to the client
+            // would disclose whatever it happens to contain.
+            throw new SeerrApiException(HttpStatusCode.BadGateway, "Seerr returned a non-JSON response.");
         }
     }
 
@@ -235,7 +265,9 @@ public sealed class SeerrClient : ISeerrClient
         }
         catch (JsonException)
         {
-            return body.Length > 500 ? body[..500] : body;
+            // A non-JSON error body is not Seerr's; returning it would forward an
+            // arbitrary upstream page to the caller. Let the generic status message stand.
+            return null;
         }
 
         return null;
@@ -251,7 +283,7 @@ public sealed class SeerrClient : ISeerrClient
         return node.GetValueKind() == JsonValueKind.String ? node.GetValue<string>() : node.ToJsonString();
     }
 
-    private static string Sanitize(string value, string apiKey)
+    private static string Sanitize(string value, string? apiKey)
     {
         return string.IsNullOrEmpty(apiKey)
             ? value

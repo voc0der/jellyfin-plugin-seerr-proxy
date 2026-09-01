@@ -17,11 +17,93 @@ dotnet build --configuration Release
 
 ## Testing
 
-Run tests locally before opening a PR:
+Run tests locally before opening a PR. The test project lives outside the plugin
+project's directory so that `dotnet build` at the repository root still resolves to the
+plugin alone, so give it an explicit path:
 
 ```bash
-dotnet test --configuration Release
+dotnet test tests/Jellyfin.Plugin.SeerrProxy.Tests --configuration Release
 ```
+
+Anything under [Security/](Security/) is covered by tests, and should stay that way —
+see [docs/SECURITY.md](docs/SECURITY.md) for the invariants those tests exist to protect.
+
+## Coverage
+
+The coverage badge in the README is a **manually updated** number, measured the same way
+as the sibling [`jellyfin-plugin-session-provisioning`](https://github.com/voc0der/jellyfin-plugin-session-provisioning)
+repository: coverlet's raw overall line rate, with no exclusions and no filtering. Refresh
+it in the same commit as any change that moves it meaningfully.
+
+`coverlet.collector` is already referenced by the test project, so no extra tooling is
+needed:
+
+```bash
+dotnet test tests/Jellyfin.Plugin.SeerrProxy.Tests \
+  --configuration Release \
+  --collect:"XPlat Code Coverage" \
+  --results-directory /tmp/seerr-proxy-coverage
+```
+
+That writes `coverage.cobertura.xml` under a GUID-named subdirectory. The badge number is
+the top-level `line-rate` attribute of that file, as a percentage, rounded to the nearest
+whole number:
+
+```bash
+python3 - <<'EOF'
+import glob, xml.etree.ElementTree as ET
+report = glob.glob("/tmp/seerr-proxy-coverage/**/coverage.cobertura.xml", recursive=True)[0]
+root = ET.parse(report).getroot()
+rate = float(root.get("line-rate")) * 100
+print("line-rate %.2f%% (%s/%s lines) -> badge %d%%" % (
+    rate, root.get("lines-covered"), root.get("lines-valid"), round(rate)))
+EOF
+```
+
+Then update the badge URL in [README.md](README.md), keeping the shields.io colour honest
+(`red` under 40, `orange` under 60, `yellow` under 75, `yellowgreen` under 85, `green`
+under 95, `brightgreen` at or above 95).
+
+### What the number does and does not say
+
+Two caveats worth knowing before reading it as a quality signal.
+
+It counts **generated code**. The `[GeneratedRegex]` partial methods in
+[Security/ApiAllowlist.cs](Security/ApiAllowlist.cs) and
+[Security/LogSanitizer.cs](Security/LogSanitizer.cs) expand into a few hundred lines of
+generated matcher under `obj/`, which the tests exercise heavily. Excluding it would
+*lower* this repository's figure, not raise it. It is left in because the reference
+repository leaves it in, and a badge comparable across the two is worth more than a badge
+that is arguably purer.
+
+It counts **model boilerplate alongside logic**. Property getters on the response types
+score the same as a gate. Read the per-file breakdown, not just the headline: every type
+under [Security/](Security/), plus [Seerr/SeerrUriBuilder.cs](Seerr/SeerrUriBuilder.cs) and
+[PluginServiceRegistrator.cs](PluginServiceRegistrator.cs), sits at 100%, and those are the
+pieces carrying the security argument in [docs/SECURITY.md](docs/SECURITY.md).
+
+### Testing the controller and the client
+
+Both need faking, and the patterns are already in the suite — copy them rather than
+inventing a third approach.
+
+`SeerrProxyController` reads configuration through the static `Plugin.Instance`, so
+[PluginTestHost](tests/Jellyfin.Plugin.SeerrProxy.Tests/PluginTestHost.cs) stands a plugin
+up by answering `IXmlSerializer.DeserializeFromFile` with the configuration under test —
+no disk, no `UpdateConfiguration` write-back. Because `Plugin.Instance` is process-wide,
+every test class that constructs a plugin must join the `PluginInstance` xUnit collection
+so they cannot run concurrently.
+
+Jellyfin's `AuthorizationInfo.UserId` is computed as `User?.Id ?? Guid.Empty` and has no
+setter, so presenting an authenticated user means attaching a real
+`Jellyfin.Database.Implementations.Entities.User`. Leaving `User` null and setting
+`IsApiKey` is how you simulate an API-key caller — the case that must never be able to
+proxy.
+
+`SeerrClient` is driven through a stub `HttpMessageHandler`
+([SeerrClientTests](tests/Jellyfin.Plugin.SeerrProxy.Tests/SeerrClientTests.cs)) that
+records what left the process. Request content has to be captured inside the handler:
+`SeerrClient` disposes the request as soon as the call returns.
 
 ## Plugin GUID Safety
 
