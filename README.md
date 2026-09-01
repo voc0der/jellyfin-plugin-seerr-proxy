@@ -112,10 +112,24 @@ All optional. None are `JELLYFIN_`-prefixed on purpose: Jellyfin logs the value 
 
 The file form wins when both forms of a value are set, and an environment-supplied API key wins over one stored in plugin configuration.
 
-```sh
-# generate an operator secret and the hash to configure
+On a trusted machine, generate the operator secret and its hash:
+
+```bash
 SECRET="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
-printf '%s' "$SECRET" | sha256sum
+HASH="$(printf '%s' "$SECRET" | sha256sum | awk '{print $1}')"
+printf 'Operator secret (keep for the caller): %s\n' "$SECRET"
+printf 'Operator hash   (give Jellyfin):       %s\n' "$HASH"
+```
+
+Give the hash to Jellyfin and keep the secret for whatever calls the elevated endpoint:
+
+```yaml
+services:
+  jellyfin:
+    environment:
+      SEERR_PROXY_ADMIN_SECRET_HASH_FILE: /run/secrets/seerr-proxy-hash
+    volumes:
+      - ./seerr-proxy-hash:/run/secrets/seerr-proxy-hash:ro
 ```
 
 ## Installation

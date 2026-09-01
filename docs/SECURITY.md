@@ -60,20 +60,24 @@ X-Seerr-Proxy-Secret: <secret>
 
 ### Generation
 
-At least 256 bits of randomness, machine-generated:
+At least 256 bits of randomness, machine-generated. Run this on a trusted machine:
 
-```sh
-openssl rand -base64 32 | tr '+/' '-_' | tr -d '='
+```bash
+SECRET="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
+HASH="$(printf '%s' "$SECRET" | sha256sum | awk '{print $1}')"
+printf 'Operator secret (keep for the caller): %s\n' "$SECRET"
+printf 'Operator hash   (give Jellyfin):       %s\n' "$HASH"
 ```
+
+The `awk '{print $1}'` is not cosmetic. `sha256sum` prints `<hash>  -`, and those
+trailing characters make the configured value 67 characters rather than 64, which
+`AdminSecretVerifier` rejects as malformed — the gate then refuses every request instead
+of failing loudly.
 
 ### Storage
 
-The plugin stores nothing. Only `SHA-256(secret)`, hex-encoded, is supplied by the
-deployment environment:
-
-```sh
-printf '%s' "$SECRET" | sha256sum
-```
+The plugin stores nothing. Only `HASH` from above — `SHA-256(secret)`, hex-encoded — is
+supplied by the deployment environment:
 
 ```text
 SEERR_PROXY_ADMIN_SECRET_HASH        the hash itself
