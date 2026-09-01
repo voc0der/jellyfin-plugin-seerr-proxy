@@ -131,7 +131,6 @@
             var field = document.getElementById('txtSeerrApiKey');
             var description = document.getElementById('apiKeySourceDescription');
 
-            SeerrProxyConfig.apiKeyFromEnvironment = fromEnvironment;
             field.disabled = fromEnvironment;
 
             if (fromEnvironment) {
@@ -179,7 +178,12 @@
             ApiClient.getPluginConfiguration(SeerrProxyConfig.pluginId).then(function (config) {
                 setConfigValue(config, 'Enabled', 'enabled', document.getElementById('chkEnabled').checked);
                 setConfigValue(config, 'SeerrBaseUrl', 'seerrBaseUrl', document.getElementById('txtSeerrBaseUrl').value);
-                if (!SeerrProxyConfig.apiKeyFromEnvironment) {
+
+                // Read from the configuration just fetched, never from page-load state.
+                // The API key field is left empty and disabled when the environment
+                // supplies the key, so a stale or missing flag here would write that
+                // empty value straight over the stored one.
+                if (!getConfigValue(config, 'ApiKeyFromEnvironment', 'apiKeyFromEnvironment', false)) {
                     setConfigValue(config, 'SeerrApiKey', 'seerrApiKey', document.getElementById('txtSeerrApiKey').value);
                 }
 
