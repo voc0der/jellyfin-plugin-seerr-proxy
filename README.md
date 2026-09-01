@@ -4,6 +4,24 @@
 
 # jellyfin-seerr-proxy
 
+<p align="center">
+  <a href="https://github.com/voc0der/jellyfin-seerr-proxy/releases/latest">
+    <img src="https://img.shields.io/github/v/release/voc0der/jellyfin-seerr-proxy?label=stable%20release" alt="Stable release version" />
+  </a>
+  <a href="https://github.com/voc0der/jellyfin-seerr-proxy/tree/main/tests">
+    <img src="https://img.shields.io/badge/coverage-41%25-orange" alt="Code coverage percentage" />
+  </a>
+  <a href="https://github.com/voc0der/jellyfin-seerr-proxy/actions/workflows/codeql.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/voc0der/jellyfin-seerr-proxy/codeql.yml?branch=main&label=codeql" alt="CodeQL status" />
+  </a>
+  <a href="https://github.com/voc0der/jellyfin-seerr-proxy/issues">
+    <img src="https://img.shields.io/github/issues/voc0der/jellyfin-seerr-proxy?color=DAA520" alt="Open issues" />
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/github/license/voc0der/jellyfin-seerr-proxy?color=97CA00" alt="License" />
+  </a>
+</p>
+
 `jellyfin-seerr-proxy` is a minimal Jellyfin plugin that lets authenticated Jellyfin clients use a safe subset of the Seerr API as the currently logged-in Jellyfin user.
 
 The plugin keeps Seerr credentials on the Jellyfin server. A client such as Wholphin calls the Jellyfin plugin endpoint with its normal Jellyfin auth token; the plugin resolves that Jellyfin user to the linked Seerr user and forwards allowlisted Seerr API calls with `X-API-User` set server-side.

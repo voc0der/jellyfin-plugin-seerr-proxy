@@ -28,6 +28,64 @@ dotnet test tests/Jellyfin.Plugin.SeerrProxy.Tests --configuration Release
 Anything under [Security/](Security/) is covered by tests, and should stay that way —
 see [docs/SECURITY.md](docs/SECURITY.md) for the invariants those tests exist to protect.
 
+## Coverage
+
+The coverage badge in the README is a **manually updated** number, measured the same way
+as the sibling [`jellyfin-plugin-session-provisioning`](https://github.com/voc0der/jellyfin-plugin-session-provisioning)
+repository: coverlet's raw overall line rate, with no exclusions and no filtering. Refresh
+it in the same commit as any change that moves it meaningfully.
+
+`coverlet.collector` is already referenced by the test project, so no extra tooling is
+needed:
+
+```bash
+dotnet test tests/Jellyfin.Plugin.SeerrProxy.Tests \
+  --configuration Release \
+  --collect:"XPlat Code Coverage" \
+  --results-directory /tmp/seerr-proxy-coverage
+```
+
+That writes `coverage.cobertura.xml` under a GUID-named subdirectory. The badge number is
+the top-level `line-rate` attribute of that file, as a percentage, rounded to the nearest
+whole number:
+
+```bash
+python3 - <<'EOF'
+import glob, xml.etree.ElementTree as ET
+report = glob.glob("/tmp/seerr-proxy-coverage/**/coverage.cobertura.xml", recursive=True)[0]
+root = ET.parse(report).getroot()
+rate = float(root.get("line-rate")) * 100
+print("line-rate %.2f%% (%s/%s lines) -> badge %d%%" % (
+    rate, root.get("lines-covered"), root.get("lines-valid"), round(rate)))
+EOF
+```
+
+Then update the badge URL in [README.md](README.md), keeping the shields.io colour honest
+(`red` under 40, `orange` under 60, `yellow` under 75, `yellowgreen` under 85, `green`
+under 95, `brightgreen` at or above 95).
+
+### What the number does and does not say
+
+Two caveats worth knowing before reading it as a quality signal.
+
+It counts **generated code**. The `[GeneratedRegex]` partial methods in
+[Security/ApiAllowlist.cs](Security/ApiAllowlist.cs) and
+[Security/LogSanitizer.cs](Security/LogSanitizer.cs) expand into a few hundred lines of
+generated matcher under `obj/`, which the tests exercise heavily. Excluding it would
+*lower* this repository's figure, not raise it. It is left in because the reference
+repository leaves it in, and a badge comparable across the two is worth more than a badge
+that is arguably purer.
+
+It is currently held down by the **untested controller and HTTP client**. Every type under
+[Security/](Security/) plus [Seerr/SeerrUriBuilder.cs](Seerr/SeerrUriBuilder.cs) sits at
+100%, and those are the pieces carrying the security argument in
+[docs/SECURITY.md](docs/SECURITY.md). [Api/SeerrProxyController.cs](Api/SeerrProxyController.cs)
+and [Seerr/SeerrClient.cs](Seerr/SeerrClient.cs) sit at 0%, because reaching them needs
+Jellyfin's DI surface and `HttpMessageHandler` faked out. Closing that gap is the single
+highest-value thing anyone could do to this number — see
+`SessionProvisioningControllerTests` in the sibling repository for the NSubstitute pattern
+that works.
+
 ## Plugin GUID Safety
 
 Before the first release, and any time plugin metadata changes, verify that the plugin GUID is consistent and not already used by a known catalog:
