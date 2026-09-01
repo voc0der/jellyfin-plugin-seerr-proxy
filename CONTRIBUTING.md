@@ -76,15 +76,34 @@ generated matcher under `obj/`, which the tests exercise heavily. Excluding it w
 repository leaves it in, and a badge comparable across the two is worth more than a badge
 that is arguably purer.
 
-It is currently held down by the **untested controller and HTTP client**. Every type under
-[Security/](Security/) plus [Seerr/SeerrUriBuilder.cs](Seerr/SeerrUriBuilder.cs) sits at
-100%, and those are the pieces carrying the security argument in
-[docs/SECURITY.md](docs/SECURITY.md). [Api/SeerrProxyController.cs](Api/SeerrProxyController.cs)
-and [Seerr/SeerrClient.cs](Seerr/SeerrClient.cs) sit at 0%, because reaching them needs
-Jellyfin's DI surface and `HttpMessageHandler` faked out. Closing that gap is the single
-highest-value thing anyone could do to this number — see
-`SessionProvisioningControllerTests` in the sibling repository for the NSubstitute pattern
-that works.
+It counts **model boilerplate alongside logic**. Property getters on the response types
+score the same as a gate. Read the per-file breakdown, not just the headline: every type
+under [Security/](Security/), plus [Seerr/SeerrUriBuilder.cs](Seerr/SeerrUriBuilder.cs) and
+[PluginServiceRegistrator.cs](PluginServiceRegistrator.cs), sits at 100%, and those are the
+pieces carrying the security argument in [docs/SECURITY.md](docs/SECURITY.md).
+
+### Testing the controller and the client
+
+Both need faking, and the patterns are already in the suite — copy them rather than
+inventing a third approach.
+
+`SeerrProxyController` reads configuration through the static `Plugin.Instance`, so
+[PluginTestHost](tests/Jellyfin.Plugin.SeerrProxy.Tests/PluginTestHost.cs) stands a plugin
+up by answering `IXmlSerializer.DeserializeFromFile` with the configuration under test —
+no disk, no `UpdateConfiguration` write-back. Because `Plugin.Instance` is process-wide,
+every test class that constructs a plugin must join the `PluginInstance` xUnit collection
+so they cannot run concurrently.
+
+Jellyfin's `AuthorizationInfo.UserId` is computed as `User?.Id ?? Guid.Empty` and has no
+setter, so presenting an authenticated user means attaching a real
+`Jellyfin.Database.Implementations.Entities.User`. Leaving `User` null and setting
+`IsApiKey` is how you simulate an API-key caller — the case that must never be able to
+proxy.
+
+`SeerrClient` is driven through a stub `HttpMessageHandler`
+([SeerrClientTests](tests/Jellyfin.Plugin.SeerrProxy.Tests/SeerrClientTests.cs)) that
+records what left the process. Request content has to be captured inside the handler:
+`SeerrClient` disposes the request as soon as the call returns.
 
 ## Plugin GUID Safety
 

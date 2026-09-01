@@ -9,7 +9,7 @@
     <img src="https://img.shields.io/github/v/release/voc0der/jellyfin-seerr-proxy?label=stable%20release" alt="Stable release version" />
   </a>
   <a href="https://github.com/voc0der/jellyfin-seerr-proxy/tree/main/tests">
-    <img src="https://img.shields.io/badge/coverage-41%25-orange" alt="Code coverage percentage" />
+    <img src="https://img.shields.io/badge/coverage-96%25-brightgreen" alt="Code coverage percentage" />
   </a>
   <a href="https://github.com/voc0der/jellyfin-seerr-proxy/actions/workflows/codeql.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/voc0der/jellyfin-seerr-proxy/codeql.yml?branch=main&label=codeql" alt="CodeQL status" />

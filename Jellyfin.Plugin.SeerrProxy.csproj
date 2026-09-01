@@ -21,6 +21,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- So the outbound handler's security-relevant settings can be asserted directly. -->
+    <InternalsVisibleTo Include="Jellyfin.Plugin.SeerrProxy.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Remove="tests/**/*.cs" />
     <EmbeddedResource Remove="tests/**/*" />
     <None Remove="tests/**/*.cs" />

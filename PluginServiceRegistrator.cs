@@ -40,7 +40,23 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
 
     private static HttpClient CreateHttpClient()
     {
-        var handler = new SocketsHttpHandler
+        return new HttpClient(CreateHandler(), disposeHandler: true)
+        {
+            // Per-request deadlines come from the configured timeout, applied with a
+            // linked CancellationTokenSource in SeerrClient. Leaving the client's own
+            // 100-second default in place would silently cap a longer configured value.
+            Timeout = Timeout.InfiniteTimeSpan
+        };
+    }
+
+    /// <summary>
+    /// Builds the outbound handler. Separated so its settings, which are security policy
+    /// rather than tuning, can be asserted directly.
+    /// </summary>
+    /// <returns>The configured handler.</returns>
+    internal static SocketsHttpHandler CreateHandler()
+    {
+        return new SocketsHttpHandler
         {
             // The Seerr API key travels in a custom X-Api-Key header, and .NET only
             // strips Authorization across a cross-origin redirect — a custom header is
@@ -51,14 +67,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
             AllowAutoRedirect = false,
             AutomaticDecompression = DecompressionMethods.All,
             PooledConnectionLifetime = ConnectionLifetime
-        };
-
-        return new HttpClient(handler, disposeHandler: true)
-        {
-            // Per-request deadlines come from the configured timeout, applied with a
-            // linked CancellationTokenSource in SeerrClient. Leaving the client's own
-            // 100-second default in place would silently cap a longer configured value.
-            Timeout = Timeout.InfiniteTimeSpan
         };
     }
 }
