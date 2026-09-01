@@ -47,25 +47,21 @@ public static class ForwardedPayload
             return payload;
         }
 
-        List<string>? stripped = null;
+        // Seerr's API is case-sensitive, but a client could try a differently-cased
+        // spelling in the hope that some layer normalizes it, so match without regard to
+        // case. Materialized before anything is removed: the payload cannot be mutated
+        // while it is still being enumerated.
+        var matches = payloadObject
+            .Select(property => property.Key)
+            .Where(key => IdentityProperties.Contains(key, StringComparer.OrdinalIgnoreCase))
+            .ToList();
 
-        foreach (var identityProperty in IdentityProperties)
+        foreach (var match in matches)
         {
-            // Seerr's API is case-sensitive, but a client could try a differently-cased
-            // spelling in the hope that some layer normalizes it. Remove every match.
-            var matches = payloadObject
-                .Where(property => string.Equals(property.Key, identityProperty, StringComparison.OrdinalIgnoreCase))
-                .Select(property => property.Key)
-                .ToList();
-
-            foreach (var match in matches)
-            {
-                payloadObject.Remove(match);
-                (stripped ??= []).Add(match);
-            }
+            payloadObject.Remove(match);
         }
 
-        removed = stripped is null ? [] : stripped;
+        removed = matches;
         return payloadObject;
     }
 }
