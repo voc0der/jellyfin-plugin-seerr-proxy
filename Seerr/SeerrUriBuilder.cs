@@ -77,18 +77,15 @@ public static class SeerrUriBuilder
             Fragment = string.Empty
         };
 
-        var basePath = builder.Path.TrimEnd('/');
-        if (!basePath.EndsWith("/api/v1", StringComparison.OrdinalIgnoreCase)
-            && !basePath.Equals("api/v1", StringComparison.OrdinalIgnoreCase))
-        {
-            builder.Path = string.IsNullOrWhiteSpace(basePath) || basePath == "/"
-                ? "api/v1/"
-                : basePath.TrimStart('/') + "/api/v1/";
-        }
-        else
-        {
-            builder.Path = basePath.TrimStart('/') + "/";
-        }
+        // UriBuilder always yields a leading slash, so trim both ends once and reason
+        // about the bare path from here on.
+        var basePath = builder.Path.Trim('/');
+        var alreadyRooted = basePath.Equals("api/v1", StringComparison.OrdinalIgnoreCase)
+            || basePath.EndsWith("/api/v1", StringComparison.OrdinalIgnoreCase);
+
+        builder.Path = alreadyRooted
+            ? basePath + "/"
+            : string.IsNullOrWhiteSpace(basePath) ? "api/v1/" : basePath + "/api/v1/";
 
         return builder.Uri;
     }
