@@ -63,11 +63,42 @@ Supported methods and route families:
 - `PUT request/{id}`
 - `DELETE request/{id}`
 
-Client-provided identity fields and authentication headers are ignored. Do not send `userId`, `X-API-User`, cookies, or a Seerr API key; the plugin derives the requester from Jellyfin authentication only.
+Client-provided identity fields and authentication headers are ignored, and this is enforced rather than merely documented: inbound headers are never copied to the outbound request, and `userId`, `user`, `requestedBy`, and `modifiedBy` are stripped from the top level of every forwarded body. The plugin derives the requester from Jellyfin authentication only.
+
+Requests are rate limited to 120 per Jellyfin user per minute, and bodies larger than 256 KiB are refused with 413.
 
 ### `POST /Plugins/SeerrProxy/Test`
 
-Dashboard-only elevated endpoint used by the configuration page to test Seerr reachability and the configured API key.
+Dashboard-only elevated endpoint used by the configuration page to test Seerr reachability and the configured API key. Rate limited to 30 requests per minute server-wide, and gated by the operator secret when one is configured.
+
+## Security
+
+Full detail in [docs/SECURITY.md](docs/SECURITY.md). The short version:
+
+- A Jellyfin **API key is not a user** and can never proxy — only a real authenticated user can. This matters because Jellyfin 10.11.x grants every API key the `Administrator` role.
+- The Seerr API key can be supplied by the **environment** instead of plugin configuration, so it never enters Jellyfin's config XML and can never be read back through the plugin configuration endpoint.
+- The elevated `Test` endpoint can be gated by a second, **operator-held secret** that the plugin only ever stores as a SHA-256 hash.
+- Forwarded paths are **allowlisted** and cannot escape Seerr's `/api/v1/` root; redirects are never followed, so the API key cannot be carried to another host.
+
+### Environment variables
+
+All optional. None are `JELLYFIN_`-prefixed on purpose: Jellyfin logs the value of every `JELLYFIN_`, `DOTNET_`, and `ASPNETCORE_` variable at startup.
+
+| Variable | Purpose |
+| --- | --- |
+| `SEERR_PROXY_API_KEY_FILE` | Path to a file holding the Seerr API key. Preferred. |
+| `SEERR_PROXY_API_KEY` | The Seerr API key itself. |
+| `SEERR_PROXY_ADMIN_SECRET_HASH_FILE` | Path to a file holding the operator secret hash. Preferred. |
+| `SEERR_PROXY_ADMIN_SECRET_HASH` | Hex-encoded `SHA-256` of the operator secret. |
+| `SEERR_PROXY_REQUIRE_ADMIN_SECRET` | Set to `1` to make the operator secret mandatory rather than opt-in. |
+
+The file form wins when both forms of a value are set, and an environment-supplied API key wins over one stored in plugin configuration.
+
+```sh
+# generate an operator secret and the hash to configure
+SECRET="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
+printf '%s' "$SECRET" | sha256sum
+```
 
 ## Installation
 

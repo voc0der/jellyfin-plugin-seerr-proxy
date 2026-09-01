@@ -17,11 +17,16 @@ dotnet build --configuration Release
 
 ## Testing
 
-Run tests locally before opening a PR:
+Run tests locally before opening a PR. The test project lives outside the plugin
+project's directory so that `dotnet build` at the repository root still resolves to the
+plugin alone, so give it an explicit path:
 
 ```bash
-dotnet test --configuration Release
+dotnet test tests/Jellyfin.Plugin.SeerrProxy.Tests --configuration Release
 ```
+
+Anything under [Security/](Security/) is covered by tests, and should stay that way —
+see [docs/SECURITY.md](docs/SECURITY.md) for the invariants those tests exist to protect.
 
 ## Plugin GUID Safety
 
