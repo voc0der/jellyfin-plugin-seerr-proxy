@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/voc0der/jellyfin-seerr-proxy/main/icon.png",
     "versions": [
       {
+        "version": "1.0.0.10",
+        "changelog": "## What's Changed\n\n- refactor: resolve code scanning alerts 3 through 7 (#11) (012c0bb)\n- docs: regenerate the configuration page screenshot [skip ci] (ab80a5e)\n\n**Full Changelog**: https://github.com/voc0der/jellyfin-seerr-proxy/compare/1.0.0.9...1.0.0.10\n",
+        "targetAbi": "10.11.6.0",
+        "sourceUrl": "https://github.com/voc0der/jellyfin-seerr-proxy/releases/download/1.0.0.10/Seerr_Proxy_1.0.0.10.zip",
+        "checksum": "022b434596cc44622ad331fcaf49247e",
+        "timestamp": "2026-09-01T17:30:31Z"
+      },
+      {
         "version": "1.0.0.9",
         "changelog": "## What's Changed\n\n- feat(security): operator secret gate and Seerr proxy hardening (#10) (eddd9bf)\n- chore(deps): bump github/codeql-action from 4 to 4.37.4 [skip ci] (d16f25f)\n- docs(readme): add configuration page screenshot [skip ci] (eed21a3)\n- docs: add configuration page screenshot [skip ci] (c8fd919)\n- chore(ci): notify centralized plugin catalog [skip ci] (c758fd9)\n- docs: remove star history section [skip ci] (c8a6e26)\n\n**Full Changelog**: https://github.com/voc0der/jellyfin-seerr-proxy/compare/1.0.0.8...1.0.0.9\n",
         "targetAbi": "10.11.6.0",
