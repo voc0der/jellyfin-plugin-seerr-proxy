@@ -141,6 +141,9 @@ services:
 3. Install **Seerr Proxy** from **Catalog**
 4. Restart Jellyfin
 
+> [!NOTE]
+> Full repository of this author's plugins: [voc0der/jellyfin-plugins](https://github.com/voc0der/jellyfin-plugins).
+
 ### Manual Install
 
 1. Download the latest ZIP from the releases page
