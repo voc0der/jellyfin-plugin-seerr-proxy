@@ -8,6 +8,13 @@
 
 The plugin keeps Seerr credentials on the Jellyfin server. A client such as Wholphin calls the Jellyfin plugin endpoint with its normal Jellyfin auth token; the plugin resolves that Jellyfin user to the linked Seerr user and forwards allowlisted Seerr API calls with `X-API-User` set server-side.
 
+<p align="center">
+  <img src="docs/images/seerr-proxy-settings.png" alt="Seerr Proxy plugin configuration screen in Jellyfin" width="880" />
+</p>
+<p align="center">
+  <em>Configuration page inside the Jellyfin dashboard</em>
+</p>
+
 ## What It Does
 
 - Exposes authenticated Jellyfin endpoints under `/Plugins/SeerrProxy`.
