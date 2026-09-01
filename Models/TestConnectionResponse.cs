@@ -21,6 +21,15 @@ public sealed class TestConnectionResponse
     public string? Version { get; set; }
 
     /// <summary>
+    /// Gets or sets where the Seerr API key came from.
+    /// </summary>
+    /// <remarks>
+    /// Either <c>environment</c> or <c>configuration</c>. Names the source only — never
+    /// the key, or any part of it.
+    /// </remarks>
+    public string? ApiKeySource { get; set; }
+
+    /// <summary>
     /// Gets or sets a displayable message.
     /// </summary>
     public string? Message { get; set; }
