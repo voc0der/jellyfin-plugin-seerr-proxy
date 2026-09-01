@@ -71,12 +71,9 @@ public static partial class ApiAllowlist
             return false;
         }
 
-        foreach (var segment in segments)
+        if (!segments.All(IsSafeSegment))
         {
-            if (!IsSafeSegment(segment))
-            {
-                return false;
-            }
+            return false;
         }
 
         if (HttpMethods.IsGet(method))
@@ -114,18 +111,10 @@ public static partial class ApiAllowlist
             return false;
         }
 
-        foreach (var character in query)
-        {
-            // A '#' would truncate the forwarded URI into a fragment, silently changing
-            // which Seerr endpoint is called. Control characters have no business here
-            // either; a legitimate client percent-encodes them.
-            if (character == '#' || char.IsControl(character))
-            {
-                return false;
-            }
-        }
-
-        return true;
+        // A '#' would truncate the forwarded URI into a fragment, silently changing which
+        // Seerr endpoint is called. Control characters have no business here either; a
+        // legitimate client percent-encodes them.
+        return !query.Any(character => character == '#' || char.IsControl(character));
     }
 
     /// <summary>

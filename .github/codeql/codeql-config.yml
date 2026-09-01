@@ -1,0 +1,12 @@
+name: "Seerr Proxy CodeQL config"
+
+# Build intermediates only. `obj/` holds the syntax trees the [GeneratedRegex] source
+# generator produces for Security/ApiAllowlist.cs and Security/LogSanitizer.cs, which
+# CodeQL was reporting quality findings against -- code nobody here wrote and nobody can
+# edit without abandoning the source generator.
+paths-ignore:
+  - '**/obj/**'
+  - '**/bin/**'
+
+queries:
+  - uses: security-and-quality
