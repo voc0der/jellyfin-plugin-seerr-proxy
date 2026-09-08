@@ -21,7 +21,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v6
       with:
-        dotnet-version: 9.0.x
+        dotnet-version: 10.0.x
 
     - name: Restore dependencies
       run: dotnet restore
@@ -36,7 +36,7 @@ jobs:
       uses: actions/upload-artifact@v7
       with:
         name: Jellyfin.Plugin.SeerrProxy
-        path: bin/Release/net9.0/Jellyfin.Plugin.SeerrProxy.dll
+        path: bin/Release/net10.0/Jellyfin.Plugin.SeerrProxy.dll
 
     - name: Generate version and changelog
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -100,7 +100,7 @@ jobs:
 
         # Create versioned folder structure
         mkdir -p "release/${FOLDER_NAME}"
-        cp bin/Release/net9.0/Jellyfin.Plugin.SeerrProxy.dll "release/${FOLDER_NAME}/"
+        cp bin/Release/net10.0/Jellyfin.Plugin.SeerrProxy.dll "release/${FOLDER_NAME}/"
 
         # Create ZIP
         cd release
@@ -131,7 +131,7 @@ jobs:
            '.[0].imageUrl = $imageUrl | .[0].versions = [{
              "version": $version,
              "changelog": $changelog,
-             "targetAbi": "10.11.6.0",
+             "targetAbi": "12.0.0.0",
              "sourceUrl": $url,
              "checksum": $checksum,
              "timestamp": $timestamp
