@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/voc0der/jellyfin-plugin-seerr-proxy/main/icon.png",
     "versions": [
       {
+        "version": "1.0.0.11",
+        "changelog": "## What's Changed\n\n- chore: target Jellyfin 12.0.0 and .NET 10 (3a6b2b0)\n- docs(contributing): document branch, commit and PR naming [skip ci] (eaea4f8)\n- docs: link back to the full plugin repository [skip ci] (a080ef0)\n- docs: follow the repository rename to jellyfin-plugin-seerr-proxy [skip ci] (74cf1b1)\n- docs: fix the operator secret generation snippet [skip ci] (9f10aa9)\n\n**Full Changelog**: https://github.com/voc0der/jellyfin-plugin-seerr-proxy/compare/1.0.0.10...1.0.0.11\n",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/voc0der/jellyfin-plugin-seerr-proxy/releases/download/1.0.0.11/Seerr_Proxy_1.0.0.11.zip",
+        "checksum": "82088f0734a5f664a3129ccafc2cd240",
+        "timestamp": "2026-09-08T21:16:59Z"
+      },
+      {
         "version": "1.0.0.10",
         "changelog": "## What's Changed\n\n- refactor: resolve code scanning alerts 3 through 7 (#11) (012c0bb)\n- docs: regenerate the configuration page screenshot [skip ci] (ab80a5e)\n\n**Full Changelog**: https://github.com/voc0der/jellyfin-plugin-seerr-proxy/compare/1.0.0.9...1.0.0.10\n",
         "targetAbi": "10.11.6.0",
