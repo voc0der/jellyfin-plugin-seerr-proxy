@@ -55,3 +55,23 @@ jobs:
       uses: github/codeql-action/analyze@v4.37.9
       with:
         category: '/language:${{ matrix.language }}'
+        output: sarif-results
+        upload: failure-only
+
+    # paths-ignore cannot keep a manual C# build out of obj/, where the [GeneratedRegex]
+    # source generator writes the syntax trees for ApiAllowlist and LogSanitizer. Results
+    # there are in code nobody here wrote, so drop them before uploading.
+    - name: Filter build intermediates
+      uses: advanced-security/filter-sarif@v1.1
+      with:
+        patterns: |
+          -**/obj/**
+          -**/bin/**
+        input: sarif-results/${{ matrix.language }}.sarif
+        output: sarif-results/${{ matrix.language }}.sarif
+
+    - name: Upload SARIF
+      uses: github/codeql-action/upload-sarif@v4.37.9
+      with:
+        sarif_file: sarif-results/${{ matrix.language }}.sarif
+        category: '/language:${{ matrix.language }}'
