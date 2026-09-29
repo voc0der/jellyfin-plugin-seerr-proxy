@@ -189,9 +189,9 @@ public sealed class SeerrProxyControllerTests
     {
         SetPluginStatus(status);
 
-        Assert.Equal(StatusCodes.Status404NotFound, StatusOf(await CreateController().GetStatus(default)));
-        Assert.Equal(StatusCodes.Status404NotFound, StatusOf(await CreateController().ForwardApiRequest("search", default)));
-        Assert.Equal(StatusCodes.Status404NotFound, StatusOf(await CreateController(method: "POST").TestConnection(default)));
+        Assert.Equal(StatusCodes.Status404NotFound, StatusOf(await CreateController().GetStatus(TestContext.Current.CancellationToken)));
+        Assert.Equal(StatusCodes.Status404NotFound, StatusOf(await CreateController().ForwardApiRequest("search", TestContext.Current.CancellationToken)));
+        Assert.Equal(StatusCodes.Status404NotFound, StatusOf(await CreateController(method: "POST").TestConnection(TestContext.Current.CancellationToken)));
         await AssertNothingForwarded();
     }
 
@@ -200,7 +200,7 @@ public sealed class SeerrProxyControllerTests
     {
         SetPluginStatus(PluginStatus.Active, isSupported: false);
 
-        Assert.Equal(StatusCodes.Status404NotFound, StatusOf(await CreateController().ForwardApiRequest("search", default)));
+        Assert.Equal(StatusCodes.Status404NotFound, StatusOf(await CreateController().ForwardApiRequest("search", TestContext.Current.CancellationToken)));
         await AssertNothingForwarded();
     }
 
@@ -211,7 +211,7 @@ public sealed class SeerrProxyControllerTests
     {
         SetNoPluginRecord();
 
-        var result = await CreateController().ForwardApiRequest("search", default);
+        var result = await CreateController().ForwardApiRequest("search", TestContext.Current.CancellationToken);
 
         Assert.Equal(StatusCodes.Status404NotFound, StatusOf(result));
         Assert.Equal("PluginInactive", ErrorCodeOf(result));
@@ -225,7 +225,7 @@ public sealed class SeerrProxyControllerTests
     {
         SetApiKeyCaller();
 
-        var result = await CreateController().ForwardApiRequest("search", default);
+        var result = await CreateController().ForwardApiRequest("search", TestContext.Current.CancellationToken);
 
         Assert.Equal(StatusCodes.Status401Unauthorized, StatusOf(result));
         Assert.Equal("MissingJellyfinUser", ErrorCodeOf(result));
@@ -239,7 +239,7 @@ public sealed class SeerrProxyControllerTests
     {
         SetApiKeyCaller();
 
-        Assert.Equal(StatusCodes.Status401Unauthorized, StatusOf(await CreateController().GetStatus(default)));
+        Assert.Equal(StatusCodes.Status401Unauthorized, StatusOf(await CreateController().GetStatus(TestContext.Current.CancellationToken)));
     }
 
     // ---- the allowlist ---------------------------------------------------------
@@ -255,7 +255,7 @@ public sealed class SeerrProxyControllerTests
     {
         var controller = CreateController(method: method, body: method is "POST" or "PUT" ? "{}" : null);
 
-        Assert.Equal(StatusCodes.Status200OK, StatusOf(await controller.ForwardApiRequest(path, default)));
+        Assert.Equal(StatusCodes.Status200OK, StatusOf(await controller.ForwardApiRequest(path, TestContext.Current.CancellationToken)));
 
         await _seerrClient.Received(1).ForwardApiRequestAsync(
             Arg.Any<PluginConfiguration>(),
@@ -277,7 +277,7 @@ public sealed class SeerrProxyControllerTests
     {
         var controller = CreateController(method: method, body: method == "POST" ? "{}" : null);
 
-        var result = await controller.ForwardApiRequest(path, default);
+        var result = await controller.ForwardApiRequest(path, TestContext.Current.CancellationToken);
 
         Assert.Equal(StatusCodes.Status404NotFound, StatusOf(result));
         Assert.Equal("UnsupportedProxyEndpoint", ErrorCodeOf(result));
@@ -289,7 +289,7 @@ public sealed class SeerrProxyControllerTests
     [InlineData("?a= ")]
     public async Task ForwardApiRequest_UnsafeQuery_IsNotFound(string query)
     {
-        var result = await CreateController(query: query).ForwardApiRequest("search", default);
+        var result = await CreateController(query: query).ForwardApiRequest("search", TestContext.Current.CancellationToken);
 
         Assert.Equal(StatusCodes.Status404NotFound, StatusOf(result));
         await AssertNothingForwarded();
@@ -300,7 +300,7 @@ public sealed class SeerrProxyControllerTests
     {
         var controller = CreateController(query: "?query=dune&page=2");
 
-        await controller.ForwardApiRequest("search", default);
+        await controller.ForwardApiRequest("search", TestContext.Current.CancellationToken);
 
         await _seerrClient.Received(1).ForwardApiRequestAsync(
             Arg.Any<PluginConfiguration>(),
@@ -318,7 +318,7 @@ public sealed class SeerrProxyControllerTests
     {
         var controller = CreateController(Configured(enabled: false));
 
-        Assert.Equal(StatusCodes.Status404NotFound, StatusOf(await controller.ForwardApiRequest("user/1", default)));
+        Assert.Equal(StatusCodes.Status404NotFound, StatusOf(await controller.ForwardApiRequest("user/1", TestContext.Current.CancellationToken)));
     }
 
     // ---- enabled and configured ------------------------------------------------
@@ -326,7 +326,7 @@ public sealed class SeerrProxyControllerTests
     [Fact]
     public async Task ForwardApiRequest_PluginDisabled_IsForbidden()
     {
-        var result = await CreateController(Configured(enabled: false)).ForwardApiRequest("search", default);
+        var result = await CreateController(Configured(enabled: false)).ForwardApiRequest("search", TestContext.Current.CancellationToken);
 
         Assert.Equal(StatusCodes.Status403Forbidden, StatusOf(result));
         Assert.Equal("PluginDisabled", ErrorCodeOf(result));
@@ -341,7 +341,7 @@ public sealed class SeerrProxyControllerTests
     {
         var controller = CreateController(Configured(apiKey: apiKey, baseUrl: baseUrl));
 
-        var result = await controller.ForwardApiRequest("search", default);
+        var result = await controller.ForwardApiRequest("search", TestContext.Current.CancellationToken);
 
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, StatusOf(result));
         Assert.Equal("PluginNotConfigured", ErrorCodeOf(result));
@@ -357,7 +357,7 @@ public sealed class SeerrProxyControllerTests
             method: "POST",
             body: """{"mediaType":"movie","mediaId":550,"userId":99}""");
 
-        Assert.Equal(StatusCodes.Status200OK, StatusOf(await controller.ForwardApiRequest("request", default)));
+        Assert.Equal(StatusCodes.Status200OK, StatusOf(await controller.ForwardApiRequest("request", TestContext.Current.CancellationToken)));
 
         await _seerrClient.Received(1).ForwardApiRequestAsync(
             Arg.Any<PluginConfiguration>(),
@@ -373,7 +373,7 @@ public sealed class SeerrProxyControllerTests
     {
         var controller = CreateController(method: "POST", body: """{"userId":99}""");
 
-        await controller.ForwardApiRequest("request", default);
+        await controller.ForwardApiRequest("request", TestContext.Current.CancellationToken);
 
         // The acting identity is the Seerr user resolved from Jellyfin auth, never 99.
         await _seerrClient.Received(1).ForwardApiRequestAsync(
@@ -388,7 +388,7 @@ public sealed class SeerrProxyControllerTests
     [Fact]
     public async Task ForwardApiRequest_ResolvesTheSeerrUserFromJellyfinAuthentication()
     {
-        await CreateController().ForwardApiRequest("search", default);
+        await CreateController().ForwardApiRequest("search", TestContext.Current.CancellationToken);
 
         await _seerrClient.Received(1).GetUserByJellyfinIdAsync(
             Arg.Any<PluginConfiguration>(), JellyfinUserIdText, Arg.Any<CancellationToken>());
@@ -402,7 +402,7 @@ public sealed class SeerrProxyControllerTests
         var oversized = "{\"pad\":\"" + new string('a', 300 * 1024) + "\"}";
         var controller = CreateController(method: "POST", body: oversized);
 
-        var result = await controller.ForwardApiRequest("request", default);
+        var result = await controller.ForwardApiRequest("request", TestContext.Current.CancellationToken);
 
         Assert.Equal(StatusCodes.Status413PayloadTooLarge, StatusOf(result));
         Assert.Equal("RequestBodyTooLarge", ErrorCodeOf(result));
@@ -414,7 +414,7 @@ public sealed class SeerrProxyControllerTests
     {
         var controller = CreateController(method: "POST", body: "{not json");
 
-        var result = await controller.ForwardApiRequest("request", default);
+        var result = await controller.ForwardApiRequest("request", TestContext.Current.CancellationToken);
 
         Assert.Equal(StatusCodes.Status400BadRequest, StatusOf(result));
         Assert.Equal("InvalidJson", ErrorCodeOf(result));
@@ -426,7 +426,7 @@ public sealed class SeerrProxyControllerTests
     {
         var controller = CreateController(method: "POST", body: "");
 
-        Assert.Equal(StatusCodes.Status200OK, StatusOf(await controller.ForwardApiRequest("request", default)));
+        Assert.Equal(StatusCodes.Status200OK, StatusOf(await controller.ForwardApiRequest("request", TestContext.Current.CancellationToken)));
 
         await _seerrClient.Received(1).ForwardApiRequestAsync(
             Arg.Any<PluginConfiguration>(),
@@ -442,7 +442,7 @@ public sealed class SeerrProxyControllerTests
     {
         var controller = CreateController(body: """{"userId":99}""");
 
-        await controller.ForwardApiRequest("search", default);
+        await controller.ForwardApiRequest("search", TestContext.Current.CancellationToken);
 
         await _seerrClient.Received(1).ForwardApiRequestAsync(
             Arg.Any<PluginConfiguration>(),
@@ -460,10 +460,10 @@ public sealed class SeerrProxyControllerTests
     {
         using var limiter = new SeerrProxyRateLimiter(1, 1000, TimeSpan.FromMinutes(1));
 
-        Assert.Equal(StatusCodes.Status200OK, StatusOf(await CreateController(rateLimiter: limiter).ForwardApiRequest("search", default)));
+        Assert.Equal(StatusCodes.Status200OK, StatusOf(await CreateController(rateLimiter: limiter).ForwardApiRequest("search", TestContext.Current.CancellationToken)));
 
         var second = CreateController(rateLimiter: limiter);
-        var result = await second.ForwardApiRequest("search", default);
+        var result = await second.ForwardApiRequest("search", TestContext.Current.CancellationToken);
 
         Assert.Equal(StatusCodes.Status429TooManyRequests, StatusOf(result));
         Assert.Equal("RateLimited", ErrorCodeOf(result));
@@ -475,16 +475,16 @@ public sealed class SeerrProxyControllerTests
     {
         using var limiter = new SeerrProxyRateLimiter(1, 1000, TimeSpan.FromMinutes(1));
 
-        await CreateController(rateLimiter: limiter).ForwardApiRequest("search", default);
+        await CreateController(rateLimiter: limiter).ForwardApiRequest("search", TestContext.Current.CancellationToken);
         Assert.Equal(
             StatusCodes.Status429TooManyRequests,
-            StatusOf(await CreateController(rateLimiter: limiter).ForwardApiRequest("search", default)));
+            StatusOf(await CreateController(rateLimiter: limiter).ForwardApiRequest("search", TestContext.Current.CancellationToken)));
 
         SetAuthenticatedUser(Guid.Parse("99999999-8888-7777-6666-555555555555"));
 
         Assert.Equal(
             StatusCodes.Status200OK,
-            StatusOf(await CreateController(rateLimiter: limiter).ForwardApiRequest("search", default)));
+            StatusOf(await CreateController(rateLimiter: limiter).ForwardApiRequest("search", TestContext.Current.CancellationToken)));
     }
 
     // 429 rather than any outbound call proves a flood is bounded before Seerr is touched.
@@ -494,7 +494,7 @@ public sealed class SeerrProxyControllerTests
         using var limiter = new SeerrProxyRateLimiter(1, 1000, TimeSpan.FromMinutes(1));
         Assert.True(limiter.TryAcquireProxy(JellyfinUserIdText, out _)); // exhaust it
 
-        var result = await CreateController(rateLimiter: limiter).ForwardApiRequest("search", default);
+        var result = await CreateController(rateLimiter: limiter).ForwardApiRequest("search", TestContext.Current.CancellationToken);
 
         Assert.Equal(StatusCodes.Status429TooManyRequests, StatusOf(result));
         await AssertNothingForwarded();
@@ -507,7 +507,7 @@ public sealed class SeerrProxyControllerTests
     {
         var controller = CreateController(method: "POST", configuredHash: null);
 
-        Assert.Equal(StatusCodes.Status200OK, StatusOf(await controller.TestConnection(default)));
+        Assert.Equal(StatusCodes.Status200OK, StatusOf(await controller.TestConnection(TestContext.Current.CancellationToken)));
     }
 
     [Fact]
@@ -518,7 +518,7 @@ public sealed class SeerrProxyControllerTests
             configuredHash: AdminSecretVerifier.ComputeHashHex(Secret),
             presentedSecret: Secret);
 
-        var result = await controller.TestConnection(default);
+        var result = await controller.TestConnection(TestContext.Current.CancellationToken);
 
         Assert.Equal(StatusCodes.Status200OK, StatusOf(result));
         var body = Assert.IsType<TestConnectionResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
@@ -540,7 +540,7 @@ public sealed class SeerrProxyControllerTests
             configuredHash: AdminSecretVerifier.ComputeHashHex(Secret),
             presentedSecret: presented);
 
-        var result = await controller.TestConnection(default);
+        var result = await controller.TestConnection(TestContext.Current.CancellationToken);
 
         Assert.Equal(StatusCodes.Status403Forbidden, StatusOf(result));
         Assert.Equal("OperatorSecretRequired", ErrorCodeOf(result.Result!));
@@ -561,7 +561,7 @@ public sealed class SeerrProxyControllerTests
             requireSecret: true,
             presentedSecret: Secret);
 
-        Assert.Equal(StatusCodes.Status403Forbidden, StatusOf(await controller.TestConnection(default)));
+        Assert.Equal(StatusCodes.Status403Forbidden, StatusOf(await controller.TestConnection(TestContext.Current.CancellationToken)));
     }
 
     [Fact]
@@ -577,7 +577,7 @@ public sealed class SeerrProxyControllerTests
             presentedSecret: "wrong-secret");
 
         // 429 rather than 403 proves guessing is bounded before any comparison happens.
-        Assert.Equal(StatusCodes.Status429TooManyRequests, StatusOf(await controller.TestConnection(default)));
+        Assert.Equal(StatusCodes.Status429TooManyRequests, StatusOf(await controller.TestConnection(TestContext.Current.CancellationToken)));
     }
 
     [Fact]
@@ -589,7 +589,7 @@ public sealed class SeerrProxyControllerTests
 
         var controller = CreateController(method: "POST", rateLimiter: limiter);
 
-        Assert.Equal(StatusCodes.Status404NotFound, StatusOf(await controller.TestConnection(default)));
+        Assert.Equal(StatusCodes.Status404NotFound, StatusOf(await controller.TestConnection(TestContext.Current.CancellationToken)));
     }
 
     // Deliberate: an administrator must be able to verify a connection before enabling
@@ -599,7 +599,7 @@ public sealed class SeerrProxyControllerTests
     {
         var controller = CreateController(Configured(enabled: false), method: "POST");
 
-        Assert.Equal(StatusCodes.Status200OK, StatusOf(await controller.TestConnection(default)));
+        Assert.Equal(StatusCodes.Status200OK, StatusOf(await controller.TestConnection(TestContext.Current.CancellationToken)));
     }
 
     [Fact]
@@ -607,7 +607,7 @@ public sealed class SeerrProxyControllerTests
     {
         var controller = CreateController(Configured(apiKey: null), method: "POST");
 
-        Assert.Equal(StatusCodes.Status503ServiceUnavailable, StatusOf(await controller.TestConnection(default)));
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, StatusOf(await controller.TestConnection(TestContext.Current.CancellationToken)));
     }
 
     // ---- error mapping ---------------------------------------------------------
@@ -618,7 +618,7 @@ public sealed class SeerrProxyControllerTests
         _seerrClient.GetUserByJellyfinIdAsync(Arg.Any<PluginConfiguration>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Throws(new SeerrApiException(HttpStatusCode.NotFound, "not found"));
 
-        var result = await CreateController().ForwardApiRequest("search", default);
+        var result = await CreateController().ForwardApiRequest("search", TestContext.Current.CancellationToken);
 
         Assert.Equal(StatusCodes.Status404NotFound, StatusOf(result));
         Assert.Equal("SeerrUserNotLinked", ErrorCodeOf(result));
@@ -630,7 +630,7 @@ public sealed class SeerrProxyControllerTests
         _seerrClient.GetUserByJellyfinIdAsync(Arg.Any<PluginConfiguration>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Throws(new SeerrConnectionException("down", new HttpRequestException()));
 
-        var result = await CreateController().ForwardApiRequest("search", default);
+        var result = await CreateController().ForwardApiRequest("search", TestContext.Current.CancellationToken);
 
         Assert.Equal(StatusCodes.Status502BadGateway, StatusOf(result));
         Assert.Equal("SeerrUnreachable", ErrorCodeOf(result));
@@ -642,7 +642,7 @@ public sealed class SeerrProxyControllerTests
         _seerrClient.GetUserByJellyfinIdAsync(Arg.Any<PluginConfiguration>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Throws(new SeerrConfigurationException("bad base url"));
 
-        var result = await CreateController().ForwardApiRequest("search", default);
+        var result = await CreateController().ForwardApiRequest("search", TestContext.Current.CancellationToken);
 
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, StatusOf(result));
         Assert.Equal("PluginNotConfigured", ErrorCodeOf(result));
@@ -659,7 +659,7 @@ public sealed class SeerrProxyControllerTests
                 Arg.Any<string>(), Arg.Any<JsonNode?>(), Arg.Any<CancellationToken>())
             .Throws(new SeerrApiException(upstream, "upstream said no"));
 
-        Assert.Equal(expected, StatusOf(await CreateController().ForwardApiRequest("search", default)));
+        Assert.Equal(expected, StatusOf(await CreateController().ForwardApiRequest("search", TestContext.Current.CancellationToken)));
     }
 
     // A caller must not be able to tell Seerr's internal failures apart.
@@ -674,7 +674,7 @@ public sealed class SeerrProxyControllerTests
                 Arg.Any<string>(), Arg.Any<JsonNode?>(), Arg.Any<CancellationToken>())
             .Throws(new SeerrApiException(upstream, "boom"));
 
-        Assert.Equal(StatusCodes.Status502BadGateway, StatusOf(await CreateController().ForwardApiRequest("search", default)));
+        Assert.Equal(StatusCodes.Status502BadGateway, StatusOf(await CreateController().ForwardApiRequest("search", TestContext.Current.CancellationToken)));
     }
 
     [Fact]
@@ -685,7 +685,7 @@ public sealed class SeerrProxyControllerTests
                 Arg.Any<string>(), Arg.Any<JsonNode?>(), Arg.Any<CancellationToken>())
             .Returns(new SeerrApiResult(StatusCodes.Status204NoContent, null));
 
-        var result = await CreateController(method: "DELETE").ForwardApiRequest("request/42", default);
+        var result = await CreateController(method: "DELETE").ForwardApiRequest("request/42", TestContext.Current.CancellationToken);
 
         Assert.Equal(StatusCodes.Status204NoContent, Assert.IsType<StatusCodeResult>(result).StatusCode);
     }
@@ -695,7 +695,7 @@ public sealed class SeerrProxyControllerTests
     [Fact]
     public async Task GetStatus_LinkedUser_ReportsTheLink()
     {
-        var result = await CreateController().GetStatus(default);
+        var result = await CreateController().GetStatus(TestContext.Current.CancellationToken);
 
         var body = Assert.IsType<SeerrProxyStatusResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
         Assert.True(body.Enabled);
@@ -713,7 +713,7 @@ public sealed class SeerrProxyControllerTests
         _seerrClient.GetUserByJellyfinIdAsync(Arg.Any<PluginConfiguration>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Throws(new SeerrApiException(HttpStatusCode.NotFound, "not found"));
 
-        var result = await CreateController().GetStatus(default);
+        var result = await CreateController().GetStatus(TestContext.Current.CancellationToken);
 
         var body = Assert.IsType<SeerrProxyStatusResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
         Assert.False(body.Linked);
@@ -727,7 +727,7 @@ public sealed class SeerrProxyControllerTests
         _seerrClient.GetUserByJellyfinIdAsync(Arg.Any<PluginConfiguration>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Throws(new SeerrConnectionException("down", new HttpRequestException()));
 
-        var result = await CreateController().GetStatus(default);
+        var result = await CreateController().GetStatus(TestContext.Current.CancellationToken);
 
         var body = Assert.IsType<SeerrProxyStatusResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
         Assert.False(body.SeerrReachable);
@@ -741,7 +741,7 @@ public sealed class SeerrProxyControllerTests
     {
         var controller = CreateController(Configured(enabled: enabled, apiKey: apiKey));
 
-        var result = await controller.GetStatus(default);
+        var result = await controller.GetStatus(TestContext.Current.CancellationToken);
 
         var body = Assert.IsType<SeerrProxyStatusResponse>(Assert.IsType<OkObjectResult>(result.Result).Value);
         Assert.Equal(enabled, body.Enabled);
@@ -754,7 +754,7 @@ public sealed class SeerrProxyControllerTests
     [Fact]
     public async Task GetStatus_NeverExposesTheApiKey()
     {
-        var result = await CreateController().GetStatus(default);
+        var result = await CreateController().GetStatus(TestContext.Current.CancellationToken);
 
         var serialized = System.Text.Json.JsonSerializer.Serialize(
             Assert.IsType<OkObjectResult>(result.Result).Value);
