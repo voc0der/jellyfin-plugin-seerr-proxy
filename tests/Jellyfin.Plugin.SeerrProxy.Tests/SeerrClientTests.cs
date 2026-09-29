@@ -58,7 +58,7 @@ public sealed class SeerrClientTests
     {
         var (client, handler) = Json(HttpStatusCode.OK, """{"ok":true}""");
 
-        await client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Get, "search?query=dune", null, default);
+        await client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Get, "search?query=dune", null, TestContext.Current.CancellationToken);
 
         var sent = Assert.Single(handler.Seen);
         Assert.Equal(ApiKey, Assert.Single(sent.Headers["X-Api-Key"]));
@@ -71,7 +71,7 @@ public sealed class SeerrClientTests
     {
         var (client, handler) = Json(HttpStatusCode.OK, "{}", environmentApiKey: "env-supplied-key");
 
-        await client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Get, "search", null, default);
+        await client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Get, "search", null, TestContext.Current.CancellationToken);
 
         Assert.Equal("env-supplied-key", Assert.Single(Assert.Single(handler.Seen).Headers["X-Api-Key"]));
     }
@@ -82,7 +82,7 @@ public sealed class SeerrClientTests
         var (client, handler) = Json(HttpStatusCode.OK, "{}");
 
         await Assert.ThrowsAsync<SeerrConfigurationException>(
-            () => client.ForwardApiRequestAsync(Config(apiKey: null), 7, HttpMethod.Get, "search", null, default));
+            () => client.ForwardApiRequestAsync(Config(apiKey: null), 7, HttpMethod.Get, "search", null, TestContext.Current.CancellationToken));
 
         Assert.Empty(handler.Seen);
     }
@@ -93,7 +93,7 @@ public sealed class SeerrClientTests
         var (client, handler) = Json(HttpStatusCode.Created, """{"id":1}""");
         var payload = JsonNode.Parse("""{"mediaType":"movie","mediaId":550}""");
 
-        await client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Post, "request", payload, default);
+        await client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Post, "request", payload, TestContext.Current.CancellationToken);
 
         var sent = Assert.Single(handler.Seen);
         Assert.Equal("""{"mediaType":"movie","mediaId":550}""", sent.Body);
@@ -105,7 +105,7 @@ public sealed class SeerrClientTests
     {
         var (client, handler) = Json(HttpStatusCode.OK, """{"id":7,"displayName":"Ada"}""");
 
-        await client.GetUserByJellyfinIdAsync(Config(), "abc/../def", default);
+        await client.GetUserByJellyfinIdAsync(Config(), "abc/../def", TestContext.Current.CancellationToken);
 
         Assert.Equal(
             "http://jellyseerr:5055/api/v1/user/jellyfin/abc%2F..%2Fdef",
@@ -118,7 +118,7 @@ public sealed class SeerrClientTests
         // Seerr's status endpoint is public; there is no reason to spend the credential.
         var (client, handler) = Json(HttpStatusCode.OK, """{"version":"2.1.0"}""");
 
-        var status = await client.GetStatusAsync(Config(), default);
+        var status = await client.GetStatusAsync(Config(), TestContext.Current.CancellationToken);
 
         Assert.Equal("2.1.0", status.Version);
         Assert.False(Assert.Single(handler.Seen).Headers.ContainsKey("X-Api-Key"));
@@ -131,7 +131,7 @@ public sealed class SeerrClientTests
     {
         var (client, _) = Json(HttpStatusCode.Created, """{"id":42}""");
 
-        var result = await client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Post, "request", null, default);
+        var result = await client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Post, "request", null, TestContext.Current.CancellationToken);
 
         Assert.Equal(201, result.StatusCode);
         Assert.Equal(42, result.Body!["id"]!.GetValue<int>());
@@ -145,7 +145,7 @@ public sealed class SeerrClientTests
             Content = new StringContent(string.Empty)
         }));
 
-        var result = await client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Delete, "request/42", null, default);
+        var result = await client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Delete, "request/42", null, TestContext.Current.CancellationToken);
 
         Assert.Equal(204, result.StatusCode);
         Assert.Null(result.Body);
@@ -167,7 +167,7 @@ public sealed class SeerrClientTests
         });
 
         var ex = await Assert.ThrowsAsync<SeerrConfigurationException>(
-            () => client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Get, "search", null, default));
+            () => client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Get, "search", null, TestContext.Current.CancellationToken));
 
         Assert.Contains("base URL", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
@@ -182,7 +182,7 @@ public sealed class SeerrClientTests
         }));
 
         var ex = await Assert.ThrowsAsync<SeerrApiException>(
-            () => client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Get, "search", null, default));
+            () => client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Get, "search", null, TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.BadGateway, ex.StatusCode);
         Assert.DoesNotContain("guest network", ex.Message, StringComparison.Ordinal);
@@ -198,7 +198,7 @@ public sealed class SeerrClientTests
         }));
 
         var ex = await Assert.ThrowsAsync<SeerrApiException>(
-            () => client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Get, "search", null, default));
+            () => client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Get, "search", null, TestContext.Current.CancellationToken));
 
         Assert.DoesNotContain("10.0.0.5", ex.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("nginx", ex.Message, StringComparison.Ordinal);
@@ -213,7 +213,7 @@ public sealed class SeerrClientTests
         var (client, _) = Json(HttpStatusCode.BadRequest, body);
 
         var ex = await Assert.ThrowsAsync<SeerrApiException>(
-            () => client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Get, "search", null, default));
+            () => client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Get, "search", null, TestContext.Current.CancellationToken));
 
         Assert.Equal(expected, ex.Message);
         Assert.Equal(HttpStatusCode.BadRequest, ex.StatusCode);
@@ -225,7 +225,7 @@ public sealed class SeerrClientTests
         var (client, _) = Json(HttpStatusCode.Unauthorized, $$"""{"message":"bad key {{ApiKey}}"}""");
 
         var ex = await Assert.ThrowsAsync<SeerrApiException>(
-            () => client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Get, "search", null, default));
+            () => client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Get, "search", null, TestContext.Current.CancellationToken));
 
         Assert.DoesNotContain(ApiKey, ex.Message, StringComparison.Ordinal);
         Assert.Contains("[redacted]", ex.Message, StringComparison.Ordinal);
@@ -237,7 +237,7 @@ public sealed class SeerrClientTests
         var (client, _) = Json(HttpStatusCode.OK, """{"id":0}""");
 
         var ex = await Assert.ThrowsAsync<SeerrApiException>(
-            () => client.GetUserByJellyfinIdAsync(Config(), "abc", default));
+            () => client.GetUserByJellyfinIdAsync(Config(), "abc", TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.BadGateway, ex.StatusCode);
     }
@@ -253,7 +253,7 @@ public sealed class SeerrClientTests
         }));
 
         var ex = await Assert.ThrowsAsync<SeerrApiException>(
-            () => client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Get, "search", null, default));
+            () => client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Get, "search", null, TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.BadGateway, ex.StatusCode);
         Assert.Contains("too large", ex.Message, StringComparison.OrdinalIgnoreCase);
@@ -269,7 +269,7 @@ public sealed class SeerrClientTests
         }));
 
         var ex = await Assert.ThrowsAsync<SeerrApiException>(
-            () => client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Get, "search", null, default));
+            () => client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Get, "search", null, TestContext.Current.CancellationToken));
 
         Assert.Equal(HttpStatusCode.BadGateway, ex.StatusCode);
     }
@@ -284,7 +284,7 @@ public sealed class SeerrClientTests
         });
 
         var ex = await Assert.ThrowsAsync<SeerrConnectionException>(
-            () => client.ForwardApiRequestAsync(Config(timeoutSeconds: 1), 7, HttpMethod.Get, "search", null, default));
+            () => client.ForwardApiRequestAsync(Config(timeoutSeconds: 1), 7, HttpMethod.Get, "search", null, TestContext.Current.CancellationToken));
 
         Assert.Contains("timed out", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
@@ -311,7 +311,7 @@ public sealed class SeerrClientTests
         var (client, _) = Create((_, _) => throw new HttpRequestException("no route to host"));
 
         var ex = await Assert.ThrowsAsync<SeerrConnectionException>(
-            () => client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Get, "search", null, default));
+            () => client.ForwardApiRequestAsync(Config(), 7, HttpMethod.Get, "search", null, TestContext.Current.CancellationToken));
 
         Assert.Contains("unreachable", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
