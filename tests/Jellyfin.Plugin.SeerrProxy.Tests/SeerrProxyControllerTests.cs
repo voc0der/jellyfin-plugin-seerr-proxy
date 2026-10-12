@@ -40,6 +40,7 @@ public sealed class SeerrProxyControllerTests
 
     private readonly ISeerrClient _seerrClient = Substitute.For<ISeerrClient>();
     private readonly IAuthorizationContext _authorizationContext = Substitute.For<IAuthorizationContext>();
+    private readonly IAuthService _authService = Substitute.For<IAuthService>();
     private readonly IPluginManager _pluginManager = Substitute.For<IPluginManager>();
 
     public SeerrProxyControllerTests()
@@ -85,10 +86,12 @@ public sealed class SeerrProxyControllerTests
         // to present a real user is to attach one.
         var info = new AuthorizationInfo
         {
+            Token = "jellyfin-user-token",
             IsAuthenticated = true,
             User = new User("ada", "Default", "Default") { Id = userId }
         };
         _authorizationContext.GetAuthorizationInfo(Arg.Any<HttpContext>()).Returns(info);
+        _authService.Authenticate(Arg.Any<HttpRequest>()).Returns(info);
     }
 
     /// <summary>
@@ -96,8 +99,11 @@ public sealed class SeerrProxyControllerTests
     /// Administrator role.
     /// </summary>
     private void SetApiKeyCaller()
-        => _authorizationContext.GetAuthorizationInfo(Arg.Any<HttpContext>())
-            .Returns(new AuthorizationInfo { IsAuthenticated = true, IsApiKey = true });
+    {
+        var info = new AuthorizationInfo { Token = "server-key", IsAuthenticated = true, IsApiKey = true };
+        _authorizationContext.GetAuthorizationInfo(Arg.Any<HttpContext>()).Returns(info);
+        _authService.Authenticate(Arg.Any<HttpRequest>()).Returns(info);
+    }
 
     private static PluginConfiguration Configured(bool enabled = true, string? apiKey = ApiKey, string? baseUrl = BaseUrl)
         => new()
@@ -131,6 +137,7 @@ public sealed class SeerrProxyControllerTests
         var controller = new SeerrProxyController(
             _seerrClient,
             _authorizationContext,
+            _authService,
             _pluginManager,
             secretSource,
             rateLimiter ?? new SeerrProxyRateLimiter(1000, 1000, TimeSpan.FromMinutes(1)),

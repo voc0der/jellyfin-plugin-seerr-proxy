@@ -31,7 +31,7 @@ Two surfaces, gated differently:
 | Surface | Gate 1 | Gate 2 | Rate limit |
 | --- | --- | --- | --- |
 | `GET /Plugins/SeerrProxy/Status` | Jellyfin auth, real user | — | per user |
-| `/Plugins/SeerrProxy/api/v1/**` | Jellyfin auth, real user | allowlist | per user |
+| `/Plugins/SeerrProxy/api/v1/**` | native Jellyfin auth or user token in `X-Api-Key`, real user | allowlist | process-wide authentication attempts, then per user |
 | `POST /Plugins/SeerrProxy/Test` | `Policies.RequiresElevation` | operator secret | process-wide |
 
 ## Why "real user" is a gate
@@ -49,6 +49,43 @@ every API key on the server the power to file requests as somebody.
 
 The elevated `Test` endpoint has no such natural defence, which is what the operator
 secret is for.
+
+## Alternate user-token transport
+
+Only `/Plugins/SeerrProxy/api/v1/**` accepts `X-Api-Key` as a transport for an individual
+**Jellyfin user access token**. This supports clients such as Wholphin that already have
+Seerr API-key authentication but need per-user Jellyfin identity. The incoming value is
+never interpreted as Seerr's administrator API key or as a shared service identity.
+
+Jellyfin 12 does not authenticate this header itself. The proxy action alone uses
+`AllowAnonymous` to bypass the inherited ASP.NET authorization filter, then enforces an
+explicit, fail-closed authentication gate before configuration access or any Seerr call.
+The plugin kill switch and allowlist run first. Normal requests use Jellyfin's
+`IAuthService.Authenticate` on the original request. Alternate-header requests use the
+same service on an isolated `HttpRequest` containing only a native
+`Authorization: MediaBrowser Token="..."` header. The real request, its principal, and
+cached authorization state are never rewritten or populated by the compatibility gate.
+No authentication scheme or policy is added to Jellyfin.
+
+The result must have a token, be currently authenticated, identify a non-disabled real
+user with a nonempty GUID, and not be a Jellyfin server-wide API key. The returned token
+must match the alternate input. Native authentication failures become a generic 401;
+their exception details are neither logged nor returned. There is no token database,
+token cache, client-supplied user-ID fallback, or default Seerr identity.
+
+An alternate token must be a single nonempty value of at most 512 unreserved ASCII
+characters (`A-Za-z0-9._~-`), which includes Jellyfin's user access tokens. This prevents
+header injection and parser ambiguity. Combining it with `Authorization`,
+`X-Emby-Authorization`, `X-Emby-Token`, `X-MediaBrowser-Token`, or the `ApiKey`/`api_key`
+query parameters is rejected, even for equal credentials or disabled legacy transports.
+Clients must choose one transport. Requests without the compatibility header continue
+through native Jellyfin authentication and its configured legacy-authorization behavior.
+
+`Status` retains normal Jellyfin authorization. `Test` retains normal elevation, its
+operator-secret gate, and its existing rate limit; neither accepts this alternate path.
+The forwarding code is unchanged: it resolves the validated user's linked Seerr account
+and constructs a fresh request using the **server-held Seerr API key** and `X-API-User`.
+The incoming Jellyfin token never becomes the outgoing `X-Api-Key`.
 
 ## The operator secret
 
@@ -206,6 +243,7 @@ refuses to issue anything that fails.
 
 ```text
 proxy surface   120 requests per Jellyfin user per minute
+proxy auth      600 authentication attempts process-wide per minute
 elevated surface 30 requests process-wide per minute
 ```
 
@@ -214,10 +252,19 @@ everyone else or turn the plugin into an amplifier pointed at Seerr. Process-wid
 much tighter on the elevated surface, where the only legitimate caller is an
 administrator pressing a button.
 
+The proxy authentication limit runs after the kill switch and allowlist, before the
+explicit native authentication gate. Both valid and invalid attempts consume it, so
+rotating bogus tokens or spoofing `X-Forwarded-For`/`X-Real-IP` cannot evade it or allocate
+unbounded rate-limit partitions. This bounds the new alternate-header validation work;
+it cannot limit Jellyfin middleware that runs before the action. Its budget is separate
+from the administrator and per-user budgets. An exhausted shared authentication budget
+returns 429 for all proxy users until the window resets; authenticated users still face
+the existing per-user bound before Seerr is contacted.
+
 The elevated limiter runs **before** the operator secret is examined, so it is also the
 brute-force bound on that secret. A correct secret does not bypass it.
 
-Both windows are process-local and reset when Jellyfin restarts. They are abuse bounds,
+All windows are process-local and reset when Jellyfin restarts. They are abuse bounds,
 not quotas. A plugin cannot add middleware to Jellyfin's pipeline, so this uses
 `System.Threading.RateLimiting` from the ASP.NET Core shared framework directly.
 
