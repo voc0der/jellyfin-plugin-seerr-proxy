@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/voc0der/jellyfin-plugin-seerr-proxy/main/icon.png",
     "versions": [
       {
+        "version": "1.0.0.12",
+        "changelog": "## What's Changed\n\n- feat(auth): support Jellyfin user tokens via X-Api-Key (b7316a4)\n- chore(deps): update github/codeql-action action to v4.38.3 (#36) (b5a8eaa)\n- chore(deps): update renovatebot/github-action action to v46.3.7 (#35) (7656a82)\n- chore(deps): update renovatebot/github-action action to v46.3.6 (#34) (6eec3b5)\n- chore(deps): update renovatebot/github-action action to v46.3.5 (#33) (265c596)\n- chore(deps): update dependency coverlet.collector to v10 (99142c0)\n- chore(deps): update dependency xunit.runner.visualstudio to v4 (af6bdbe)\n- chore(deps): update dependency microsoft.net.test.sdk to v18 (500b1a4)\n- chore(deps): move the tests to xunit.v3 (8b0fa32)\n- chore(deps): hold Jellyfin updates for approval on the Dependency Dashboard (306f97d)\n- chore(deps): check osv.dev and Dependabot alerts for vulnerabilities (528400c)\n- chore(deps): note that security fixes now come from Renovate (3cd7704)\n- chore(deps): update all non-major dependencies (#23) (0ac76b0)\n- chore(deps): move dependency updates from Dependabot to Renovate (72acf81)\n- docs(readme): add a Jellyfin version badge (e35366e)\n- chore(deps): bump github/codeql-action from 4.38.1 to 4.38.2 (f2578e8)\n- chore(ci): release only pull requests labelled release (b5bc5d5)\n- chore(deps): bump github/codeql-action from 4.38.0 to 4.38.1 (33103f7)\n- chore(deps): bump github/codeql-action from 4.37.9 to 4.38.0 (00ce31b)\n- fix(codeql): filter generated regex code out of C# results (bba313f)\n- chore(deps): bump github/codeql-action from 4.37.4 to 4.37.9 (cacacdd)\n\n**Full Changelog**: https://github.com/voc0der/jellyfin-plugin-seerr-proxy/compare/1.0.0.11...1.0.0.12\n",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/voc0der/jellyfin-plugin-seerr-proxy/releases/download/1.0.0.12/Seerr_Proxy_1.0.0.12.zip",
+        "checksum": "8b03b183ccda38ddf0c44cdcfdd509cf",
+        "timestamp": "2026-10-12T20:46:33Z"
+      },
+      {
         "version": "1.0.0.11",
         "changelog": "## What's Changed\n\n- chore: target Jellyfin 12.0.0 and .NET 10 (3a6b2b0)\n- docs(contributing): document branch, commit and PR naming [skip ci] (eaea4f8)\n- docs: link back to the full plugin repository [skip ci] (a080ef0)\n- docs: follow the repository rename to jellyfin-plugin-seerr-proxy [skip ci] (74cf1b1)\n- docs: fix the operator secret generation snippet [skip ci] (9f10aa9)\n\n**Full Changelog**: https://github.com/voc0der/jellyfin-plugin-seerr-proxy/compare/1.0.0.10...1.0.0.11\n",
         "targetAbi": "12.0.0.0",
