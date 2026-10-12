@@ -6,7 +6,7 @@ namespace Jellyfin.Plugin.SeerrProxy.Security;
 /// Bounds how often this plugin will do work, however well-credentialed the caller is.
 /// </summary>
 /// <remarks>
-/// Authorization still applies in full; this only caps the rate. Two separate bounds,
+/// Authorization still applies in full; this only caps the rate. Separate bounds,
 /// because the two surfaces fail differently:
 /// <list type="bullet">
 /// <item>
@@ -22,7 +22,7 @@ namespace Jellyfin.Plugin.SeerrProxy.Security;
 /// </item>
 /// </list>
 /// <para>
-/// Both windows are process-local and reset when Jellyfin restarts. These are abuse
+/// All windows are process-local and reset when Jellyfin restarts. These are abuse
 /// bounds, not quotas. A plugin cannot add middleware to Jellyfin's request pipeline,
 /// so this uses <see cref="System.Threading.RateLimiting"/> from the ASP.NET Core shared
 /// framework directly rather than the MVC rate-limiting middleware.
@@ -49,8 +49,14 @@ public sealed class SeerrProxyRateLimiter : IDisposable
     /// </remarks>
     public const int DefaultAdminPermitLimit = 30;
 
+    /// <summary>
+    /// Proxy authentication attempts permitted process-wide per window, including failures.
+    /// </summary>
+    public const int DefaultAuthenticationPermitLimit = 600;
+
     private readonly PartitionedRateLimiter<string> _proxyLimiter;
     private readonly FixedWindowRateLimiter _adminLimiter;
+    private readonly FixedWindowRateLimiter _authenticationLimiter;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SeerrProxyRateLimiter"/> class with
@@ -67,7 +73,8 @@ public sealed class SeerrProxyRateLimiter : IDisposable
     /// <param name="proxyPermitLimit">Proxy requests permitted per user per window.</param>
     /// <param name="adminPermitLimit">Elevated requests permitted process-wide per window.</param>
     /// <param name="window">Length of the fixed window.</param>
-    public SeerrProxyRateLimiter(int proxyPermitLimit, int adminPermitLimit, TimeSpan window)
+    /// <param name="authenticationPermitLimit">Proxy authentication attempts permitted process-wide per window.</param>
+    public SeerrProxyRateLimiter(int proxyPermitLimit, int adminPermitLimit, TimeSpan window, int authenticationPermitLimit = DefaultAuthenticationPermitLimit)
     {
         _proxyLimiter = PartitionedRateLimiter.Create<string, string>(partitionKey =>
             RateLimitPartition.GetFixedWindowLimiter(
@@ -83,6 +90,14 @@ public sealed class SeerrProxyRateLimiter : IDisposable
         _adminLimiter = new FixedWindowRateLimiter(new FixedWindowRateLimiterOptions
         {
             PermitLimit = adminPermitLimit,
+            Window = window,
+            QueueLimit = 0,
+            AutoReplenishment = true
+        });
+
+        _authenticationLimiter = new FixedWindowRateLimiter(new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = authenticationPermitLimit,
             Window = window,
             QueueLimit = 0,
             AutoReplenishment = true
@@ -112,11 +127,23 @@ public sealed class SeerrProxyRateLimiter : IDisposable
         return Evaluate(lease, out retryAfter);
     }
 
+    /// <summary>
+    /// Bounds native authentication work without trusting an unvalidated identity or IP header.
+    /// </summary>
+    /// <param name="retryAfter">How long the caller should wait, when refused.</param>
+    /// <returns><c>true</c> if authentication may proceed.</returns>
+    public bool TryAcquireAuthentication(out TimeSpan retryAfter)
+    {
+        using var lease = _authenticationLimiter.AttemptAcquire();
+        return Evaluate(lease, out retryAfter);
+    }
+
     /// <inheritdoc />
     public void Dispose()
     {
         _proxyLimiter.Dispose();
         _adminLimiter.Dispose();
+        _authenticationLimiter.Dispose();
     }
 
     private static bool Evaluate(RateLimitLease lease, out TimeSpan retryAfter)

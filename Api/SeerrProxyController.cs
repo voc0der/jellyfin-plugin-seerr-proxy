@@ -43,6 +43,7 @@ public class SeerrProxyController : ControllerBase
 
     private readonly ISeerrClient _seerrClient;
     private readonly IAuthorizationContext _authorizationContext;
+    private readonly IAuthService _authService;
     private readonly IPluginManager _pluginManager;
     private readonly SeerrProxySecretSource _secretSource;
     private readonly SeerrProxyRateLimiter _rateLimiter;
@@ -53,6 +54,7 @@ public class SeerrProxyController : ControllerBase
     /// </summary>
     /// <param name="seerrClient">Seerr API client.</param>
     /// <param name="authorizationContext">Jellyfin authorization context.</param>
+    /// <param name="authService">Jellyfin native token validation.</param>
     /// <param name="pluginManager">Jellyfin plugin manager, used for the kill switch.</param>
     /// <param name="secretSource">Supplies the operator secret hash and the Seerr API key.</param>
     /// <param name="rateLimiter">Bounds how often this plugin does work.</param>
@@ -60,6 +62,7 @@ public class SeerrProxyController : ControllerBase
     public SeerrProxyController(
         ISeerrClient seerrClient,
         IAuthorizationContext authorizationContext,
+        IAuthService authService,
         IPluginManager pluginManager,
         SeerrProxySecretSource secretSource,
         SeerrProxyRateLimiter rateLimiter,
@@ -67,6 +70,7 @@ public class SeerrProxyController : ControllerBase
     {
         _seerrClient = seerrClient;
         _authorizationContext = authorizationContext;
+        _authService = authService;
         _pluginManager = pluginManager;
         _secretSource = secretSource;
         _rateLimiter = rateLimiter;
@@ -153,13 +157,16 @@ public class SeerrProxyController : ControllerBase
     /// </summary>
     /// <param name="path">Seerr API path under /api/v1.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <response code="401">Caller is authenticated but is not a Jellyfin user.</response>
+    /// <response code="401">A single valid Jellyfin user credential is required.</response>
     /// <response code="404">The plugin is not active, or this endpoint is not allowlisted.</response>
     /// <response code="413">The request body is larger than this plugin will forward.</response>
     /// <response code="429">Too many requests; retry after the indicated delay.</response>
     /// <returns>Seerr API response.</returns>
     [AcceptVerbs("GET", "POST", "PUT", "DELETE")]
     [Route("api/v1/{**path}")]
+    // Jellyfin does not recognize X-Api-Key. Only this action bypasses its filter;
+    // the explicit native authentication gate below must precede all Seerr activity.
+    [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -181,14 +188,16 @@ public class SeerrProxyController : ControllerBase
             return NotFound(Error(StatusCodes.Status404NotFound, "UnsupportedProxyEndpoint", "This Seerr API endpoint is not available through the Jellyfin proxy."));
         }
 
-        var configuration = GetConfiguration();
-        var disabledOrUnconfigured = EnsureEnabledAndConfigured(configuration);
-        if (disabledOrUnconfigured is not null)
+        // A process-wide bound cannot be bypassed by rotating invalid tokens or
+        // spoofing forwarding headers. It runs before native credential validation.
+        if (!_rateLimiter.TryAcquireAuthentication(out var retryAfter))
         {
-            return disabledOrUnconfigured;
+            return TooManyRequests(retryAfter);
         }
 
-        var jellyfinUser = await GetAuthenticatedJellyfinUser().ConfigureAwait(false);
+        var authorizationInfo = await SeerrProxyAuthentication.Authenticate(_authService, Request).ConfigureAwait(false);
+        var jellyfinUser = authorizationInfo is null ? null : new AuthenticatedJellyfinUser(
+            authorizationInfo.UserId.ToString("N", CultureInfo.InvariantCulture), authorizationInfo.User?.Username);
         if (jellyfinUser is null)
         {
             return Unauthorized(Error(StatusCodes.Status401Unauthorized, "MissingJellyfinUser", "Authenticated request is not associated with a Jellyfin user."));
@@ -200,6 +209,13 @@ public class SeerrProxyController : ControllerBase
         if (throttled is not null)
         {
             return throttled;
+        }
+
+        var configuration = GetConfiguration();
+        var disabledOrUnconfigured = EnsureEnabledAndConfigured(configuration);
+        if (disabledOrUnconfigured is not null)
+        {
+            return disabledOrUnconfigured;
         }
 
         SeerrUser seerrUser;

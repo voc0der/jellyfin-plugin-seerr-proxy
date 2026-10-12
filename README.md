@@ -12,7 +12,7 @@
     <img src="https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2Fvoc0der%2Fjellyfin-plugin-seerr-proxy%2Fmain%2Fmanifest.json&search=%22targetAbi%22%3A%5Cs*%22(%5Cd%2B%5C.%5Cd%2B)&replace=%241%2B&label=Jellyfin%20version&color=AA5CC3" alt="Minimum Jellyfin version" />
   </a>
   <a href="https://github.com/voc0der/jellyfin-plugin-seerr-proxy/tree/main/tests">
-    <img src="https://img.shields.io/badge/coverage-96%25-brightgreen" alt="Code coverage percentage" />
+    <img src="https://img.shields.io/badge/coverage-97%25-brightgreen" alt="Code coverage percentage" />
   </a>
   <a href="https://github.com/voc0der/jellyfin-plugin-seerr-proxy/actions/workflows/codeql.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/voc0der/jellyfin-plugin-seerr-proxy/codeql.yml?branch=main&label=codeql" alt="CodeQL status" />
@@ -27,7 +27,7 @@
 
 `jellyfin-plugin-seerr-proxy` is a minimal Jellyfin plugin that lets authenticated Jellyfin clients use a safe subset of the Seerr API as the currently logged-in Jellyfin user.
 
-The plugin keeps Seerr credentials on the Jellyfin server. A client such as Wholphin calls the Jellyfin plugin endpoint with its normal Jellyfin auth token; the plugin resolves that Jellyfin user to the linked Seerr user and forwards allowlisted Seerr API calls with `X-API-User` set server-side.
+The plugin keeps Seerr credentials on the Jellyfin server. A client such as Wholphin calls the Jellyfin plugin endpoint with its Jellyfin user access token, using normal Jellyfin authorization or the proxy's `X-Api-Key` compatibility header; the plugin resolves that Jellyfin user to the linked Seerr user and forwards allowlisted Seerr API calls with `X-API-User` set server-side.
 
 <p align="center">
   <img src="docs/images/seerr-proxy-settings.png" alt="Seerr Proxy plugin configuration screen in Jellyfin" width="880" />
@@ -84,9 +84,31 @@ Supported methods and route families:
 - `PUT request/{id}`
 - `DELETE request/{id}`
 
-Client-provided identity fields and authentication headers are ignored, and this is enforced rather than merely documented: inbound headers are never copied to the outbound request, and `userId`, `user`, `requestedBy`, and `modifiedBy` are stripped from the top level of every forwarded body. The plugin derives the requester from Jellyfin authentication only.
+Client-provided Seerr identities are ignored, and inbound authentication is never forwarded: inbound headers are never copied to the outbound request, and `userId`, `user`, `requestedBy`, and `modifiedBy` are stripped from the top level of every forwarded body. The plugin derives the requester from Jellyfin authentication only.
 
 Requests are rate limited to 120 per Jellyfin user per minute, and bodies larger than 256 KiB are refused with 413.
+
+#### Clients using Seerr API-key authentication
+
+Clients such as Wholphin can use their existing Seerr API-key mode with:
+
+- Server URL: `https://jellyfin.example.com/Plugins/SeerrProxy`
+- API key: **the current user's Jellyfin access token**, never Seerr's administrator API key or a server-wide Jellyfin API key.
+
+For example:
+
+```http
+GET /Plugins/SeerrProxy/api/v1/auth/me
+X-Api-Key: <current-user-jellyfin-access-token>
+```
+
+Jellyfin validates the token, and the proxy delegates to that user's existing linked Seerr account. Alice and Bob retain their separate identities and permissions; no shared user or client changes are needed. An unlinked user receives the existing `SeerrUserNotLinked` response. Seerr receives only the server-held Seerr API key and the resolved Seerr user ID.
+
+Use one authentication transport per request. Requests combining `X-Api-Key` with native Jellyfin authorization headers or token query parameters are rejected with 401, even if the tokens match. Repeated or malformed `X-Api-Key` values are also rejected. Invalid, revoked, disabled-user, and server-wide credentials cannot proxy.
+
+This compatibility header is supported only on `/Plugins/SeerrProxy/api/v1/**`. `Status` and the elevated `Test` endpoint still require normal Jellyfin authorization. On Jellyfin 12, the proxy explicitly invokes native token validation because the host does not recognize this header; global authentication is unchanged. Native legacy-header support continues to depend on Jellyfin's settings.
+
+Proxy authentication attempts are additionally limited to 600 per minute process-wide before token validation. This includes failures and successful requests through either transport; reaching that shared limit temporarily returns 429 for all proxy users. The existing 120-per-user limit still applies after authentication.
 
 ### `POST /Plugins/SeerrProxy/Test`
 
