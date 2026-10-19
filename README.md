@@ -5,6 +5,7 @@
 # jellyfin-plugin-seerr-proxy
 
 <p align="center">
+  <img src="https://img.shields.io/badge/since-06%2F05%2F2026-blue" alt="Since badge" />
   <a href="https://github.com/voc0der/jellyfin-plugin-seerr-proxy/releases/latest">
     <img src="https://img.shields.io/github/v/release/voc0der/jellyfin-plugin-seerr-proxy?label=stable%20release" alt="Stable release version" />
   </a>
