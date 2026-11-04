@@ -173,6 +173,14 @@ public static partial class ApiAllowlist
                 || (segments.Count == 3 && IsPositiveInt(segments[1]) && SegmentEquals(segments[2], "combined_credits"));
         }
 
+        if (SegmentEquals(segments[0], "service"))
+        {
+            // Seerr numbers its first Radarr or Sonarr server 0.
+            return segments.Count is 2 or 3
+                && (SegmentEquals(segments[1], "radarr") || SegmentEquals(segments[1], "sonarr"))
+                && (segments.Count == 2 || IsNonNegativeInt(segments[2]));
+        }
+
         if (SegmentEquals(segments[0], "request"))
         {
             return segments.Count == 1 || IsRequestById(segments);
@@ -207,6 +215,11 @@ public static partial class ApiAllowlist
     private static bool IsPositiveInt(string value)
     {
         return int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var result) && result > 0;
+    }
+
+    private static bool IsNonNegativeInt(string value)
+    {
+        return int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out _);
     }
 
     /// <summary>
