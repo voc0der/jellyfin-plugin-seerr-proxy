@@ -181,6 +181,11 @@ public static partial class ApiAllowlist
                 && (segments.Count == 2 || IsNonNegativeInt(segments[2]));
         }
 
+        if (SegmentEquals(segments[0], "watchproviders"))
+        {
+            return segments.Count == 2 && (SegmentEquals(segments[1], "movies") || SegmentEquals(segments[1], "tv"));
+        }
+
         if (SegmentEquals(segments[0], "request"))
         {
             return segments.Count == 1 || IsRequestById(segments);

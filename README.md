@@ -81,6 +81,7 @@ Supported methods and route families:
 - `GET tv/{id}`, `tv/{id}/recommendations`, `tv/{id}/similar`, `tv/{id}/ratings`, `tv/{id}/season/{season}`
 - `GET person/{id}`, `person/{id}/combined_credits`
 - `GET service/radarr`, `service/radarr/{id}`, `service/sonarr`, `service/sonarr/{id}`
+- `GET watchproviders/movies`, `watchproviders/tv`
 - `GET request`, `GET request/{id}`
 - `POST request`
 - `PUT request/{id}`
