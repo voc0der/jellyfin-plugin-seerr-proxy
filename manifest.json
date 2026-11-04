@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/voc0der/jellyfin-plugin-seerr-proxy/main/icon.png",
     "versions": [
       {
+        "version": "1.0.0.14",
+        "changelog": "## What's Changed\n\n- fix(allowlist): allow Radarr and Sonarr service lookups (#52) (24f03b4)\n- docs(readme): show Jellyfin 12.4 in the version badge (#51) (2968fe3)\n\n**Full Changelog**: https://github.com/voc0der/jellyfin-plugin-seerr-proxy/compare/1.0.0.13...1.0.0.14\n",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/voc0der/jellyfin-plugin-seerr-proxy/releases/download/1.0.0.14/Seerr_Proxy_1.0.0.14.zip",
+        "checksum": "5173f490d3c8197c485bcf4c5d3209ca",
+        "timestamp": "2026-11-04T18:13:52Z"
+      },
+      {
         "version": "1.0.0.13",
         "changelog": "## What's Changed\n\n- chore(deps): update jellyfin packages to 12.4.0 (#50) (2acc939)\n- chore(deps): update renovatebot/github-action action to v46.3.11 (#49) (984f411)\n- chore(deps): update renovatebot/github-action action to v46.3.10 (#48) (e714f45)\n- chore(deps): update dependency microsoft.aspnetcore.testhost to 10.0.14 (#47) (aaaee8f)\n- chore(deps): update github/codeql-action action to v4.39.1 (#46) (40f059b)\n- chore(deps): update renovatebot/github-action action to v46.3.9 (#45) (ec604d8)\n- docs(readme): add since badge (9880f1c)\n- fix(icon): use shared Obsidian folds artwork (6fb5a26)\n- chore(deps): update github/codeql-action action to v4.39.0 (#42) (f003615)\n- chore(deps): update dependency microsoft.aspnetcore.testhost to 10.0.13 (#41) (b412438)\n- chore(deps): update dependency microsoft.net.test.sdk to 18.11.0 (#40) (3cbf09b)\n- chore(deps): update renovatebot/github-action action to v46.3.8 (#39) (d5c5edf)\n- chore(deps): update all non-major dependencies (#38) (0dcc629)\n\n**Full Changelog**: https://github.com/voc0der/jellyfin-plugin-seerr-proxy/compare/1.0.0.12...1.0.0.13\n",
         "targetAbi": "12.0.0.0",
